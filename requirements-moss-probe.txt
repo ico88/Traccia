@@ -1,0 +1,7 @@
+# Isolated experiment only; not required by AulaLocale or its Mac package.
+torch==2.15.0
+transformers==5.23.0
+safetensors==0.8.0
+numpy==2.4.6
+librosa==0.11.0
+soundfile==0.14.0

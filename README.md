@@ -105,6 +105,8 @@ Immagini fino a 20 MiB e 20 megapixel vengono validate e ricodificate in PNG. Pe
 
 Il confronto sperimentale con **Fluid Speech Pro MLX**, separato dall’app, è documentato in [docs/fluid-experiment.md](docs/fluid-experiment.md). È stato eseguito su M4; non è ancora una scelta disponibile nel pacchetto Mac.
 
+È disponibile anche una [prova separata di MOSS-Transcribe-Diarize](docs/moss-experiment.md), con timestamp e parlanti: non è incluso nel pacchetto Mac.
+
 ## Backup
 
 **Esporta backup** crea uno ZIP con uno snapshot SQLite, audio originali, versioni completate e immagini, con manifest SHA-256. Non include modelli, runtime o credenziali. Il ripristino non sovrascrive archivi esistenti:
