@@ -11,7 +11,8 @@
 - Proposte di dispensa da trascrizioni, fonti, accettazione e protezione delle modifiche manuali.
 - Immagini della materia, mappe dei capitoli, esportazione e backup/ripristino.
 - Pulizia IA GTCRN, revisione guidata dei passaggi, confronto delle modifiche della dispensa e primo consolidamento incrementale per argomenti.
-- Script di build dei runtime, launcher Mac e configurazione Docker.
+- Finestra Mac WebKit, registrazione microfono con recupero bozze, ruoli dei parlanti, isolamento VoxLock sperimentale e guadagno selezionabile.
+- Script di build dei runtime e configurazione Docker.
 
 ## Prossime verifiche e sviluppi
 

@@ -5,9 +5,10 @@ const TRANSCRIPT_PAGE_SIZE = 40;
 let reviewCursor=null, previewRange=null, transcriptSaving=false;
 let activeStudyJob = null, activeView = 'library', notesTimer = null, modelsTimer = null;
 let currentNotes = null, editingChapter = null;
-function mayLeaveTranscript() { return !transcriptDirty || window.confirm('Ci sono correzioni non salvate. Vuoi abbandonarle?'); }
+function mayLeaveTranscript() { return (!transcriptDirty && !window.aulalocaleSpeakersDirty) || window.confirm('Ci sono correzioni non salvate. Vuoi abbandonarle?'); }
 const readableTime = seconds => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2,'0')}`;
 function resetStudy() {
+  if(typeof resetSpeakers==='function')resetSpeakers();
   clearTimeout(studyTimer); reviewCursor=null;previewRange=null;$('transcription-source').value='original';$('transcript-search').value='';$('only-unreviewed').checked=false;$('repeat-passage').checked=false; transcriptPage=0;historicalTranscript=false;transcriptHead=null;$('transcript-pagination').hidden=true;$('transcript-history').replaceChildren();$('transcript-history').disabled=true; currentTranscript = null; transcriptDirty = false; activeStudyJob = null;
   $('transcript-segments').replaceChildren(); $('transcript-review-summary').textContent='';$('transcript-provenance').textContent='';$('next-unreviewed').disabled=true; $('save-transcript').hidden = true;
   $('study-progress').hidden = true; $('cancel-study').hidden = true;
@@ -62,7 +63,7 @@ function renderTranscript() {
     const check=document.createElement('input');check.type='checkbox';check.checked=reviewedSegments().has(segment.id);check.disabled=historicalTranscript || transcriptSaving;check.setAttribute('aria-label',`Rivisto all’ascolto a ${readableTime(segment.start)}`);review.append(check,document.createTextNode('Rivisto all’ascolto'));
     check.onchange=()=>{const ids=reviewedSegments();check.checked?ids.add(segment.id):ids.delete(segment.id);currentTranscript.metadata.reviewed_segment_ids=[...ids];transcriptDirty=true;$('transcribe-lesson').disabled=true;$('save-transcript').disabled=false;renderReviewSummary();if($('only-unreviewed').checked)renderTranscript();};
     text.oninput=()=>{segment.text=text.value;const ids=reviewedSegments();ids.delete(segment.id);currentTranscript.metadata.reviewed_segment_ids=[...ids];check.checked=false;transcriptDirty=true;$('transcribe-lesson').disabled=true;$('save-transcript').disabled=false;renderReviewSummary();};
-    const body=document.createElement('div');body.append(text,review);row.append(time,body);$('transcript-segments').append(row);
+    const body=document.createElement('div');if(typeof speakerForSegment==='function'){const name=speakerForSegment(segment);if(name){const voice=document.createElement('span');voice.className='voice-tag';voice.textContent=name;body.append(voice);}}body.append(text,review);row.append(time,body);$('transcript-segments').append(row);
   }
 }
 async function loadStudy() {
@@ -79,7 +80,7 @@ async function loadStudy() {
   $('cancel-study').hidden=!activeStudyJob; $('study-progress').hidden=!activeStudyJob;
   if (activeStudyJob) {
     $('study-progress').value=activeStudyJob.progress;
-    $('transcript-status').textContent=activeStudyJob.status==='queued'?'In coda: attendo il motore locale.':`Trascrizione in corso · ${Math.floor(activeStudyJob.progress)}%. L’avanzamento si aggiorna al termine di ogni blocco.`;
+    $('transcript-status').textContent=activeStudyJob.status==='queued'?'In coda: attendo il motore locale.':`${activeStudyJob.kind==='speakers'?'Analisi parlanti':'Trascrizione'} in corso · ${Math.floor(activeStudyJob.progress)}%. L’avanzamento si aggiorna al termine di ogni blocco.`;
     studyTimer=setTimeout(()=>loadStudy().catch(e=>notify(e.message,true)),2000);
   } else if (currentTranscript) $('transcript-status').textContent=historicalTranscript?'Revisione storica in sola lettura. Scegli l’ultima revisione per modificare.':'Testo automatico da verificare ascoltando i timestamp. Le correzioni vengono salvate in una nuova revisione.';
   else $('transcript-status').textContent=jobs[0] && jobs[0].status==='failed'?jobs[0].error:'Whisper Turbo · italiano · elaborazione sul dispositivo. Installa il modello nella sezione Modelli locali.';
@@ -111,17 +112,21 @@ $('player').addEventListener('timeupdate',()=>{
 async function loadModels(){
   clearTimeout(modelsTimer);const result=await request('/api/v1/models');if(activeView!=='models')return;
   $('model-list').replaceChildren();let pending=false;
-  for(const model of result.models){
+  const hiddenAssets=new Set(result.models.flatMap(model=>model.requires || []));
+  const sizeLabel=bytes=>bytes<1048576?(bytes/1024).toFixed(0)+' KiB':bytes<1073741824?(bytes/1048576).toFixed(1)+' MiB':(bytes/1073741824).toFixed(2)+' GiB';
+  for(const model of result.models.filter(model=>!hiddenAssets.has(model.id))){
+    const assets=[model,...(model.requires || []).map(id=>result.models.find(m=>m.id===id)).filter(Boolean)],complete=assets.every(m=>m.status==='installed');
+    const transfers=new Map(assets.map(m=>[m.archive?.sha256 || m.sha256,m.archive?.bytes || m.bytes]));
     const card=document.createElement('article');card.className='model-card';
     const details=document.createElement('div'), title=document.createElement('h3'),meta=document.createElement('p'),status=document.createElement('p');
-    title.textContent=model.name;meta.textContent=`${(model.bytes<1048576?(model.bytes/1024).toFixed(0)+' KiB':(model.bytes/1073741824).toFixed(2)+' GiB')} · ${model.license} · download verificato`;
+    title.textContent=model.name;meta.textContent=`${sizeLabel([...transfers.values()].reduce((a,b)=>a+b,0))} · ${model.license} · download verificato`;
     const names={installed:'Installato · pronto per lavorare offline',not_installed:'Da scaricare',queued:'In attesa di download',downloading:'Download in corso',verifying:'Verifica integrità',failed:model.error};
-    status.textContent=names[model.status] || model.status;
+    status.textContent=complete?names.installed:(model.status==='installed'?'Completa il download dei modelli collegati':names[model.status] || model.status);
     if(!result.runtimes[model.task])status.textContent+=' · runtime nativo da installare (vedi README)';
     details.append(title,meta,status);
-    const active=['queued','downloading','verifying'].includes(model.status);pending ||= active;
-    if(active){const progress=document.createElement('progress');progress.max=model.bytes;progress.value=model.downloaded;progress.setAttribute('aria-label',`Download ${model.name}`);details.append(progress);}
-    const button=document.createElement('button');button.textContent=model.status==='installed'?'Installato':active?'Download…':'Scarica modello';button.disabled=active || model.status==='installed';
+    const progressModel=assets.find(m=>['queued','downloading','verifying'].includes(m.status)),active=Boolean(progressModel);pending ||= active;
+    if(active){const progress=document.createElement('progress');progress.max=progressModel.archive?.bytes || progressModel.bytes;progress.value=progressModel.downloaded;progress.setAttribute('aria-label',`Download ${model.name}`);details.append(progress);}
+    const button=document.createElement('button');button.textContent=complete?'Installato':active?'Download…':'Scarica modelli';button.disabled=active || complete;
     button.onclick=async()=>{button.disabled=true;try{await request(`/api/v1/models/${model.id}/download`,{method:'POST'});await loadModels();}catch(e){notify(e.message,true);button.disabled=false;}};
     card.append(details,button);$('model-list').append(card);
   }

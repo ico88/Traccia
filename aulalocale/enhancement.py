@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, ConfigDict, computed_field, field_serializer
+from pydantic import BaseModel, ConfigDict, computed_field, field_serializer, Field
 import imageio_ffmpeg
 
 PRESETS = {
@@ -29,9 +29,12 @@ PRESETS = {
 
 
 class EnhancementInput(BaseModel):
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra='forbid',allow_inf_nan=False)
     preset: Literal['light', 'balanced', 'strong'] = 'balanced'
-    method: Literal['traditional','gtcrn'] = 'traditional'
+    method: Literal['traditional','gtcrn','voxlock'] = 'traditional'
+    gain_db:Literal[0,3,6,9,12]=0
+    reference_start:float | None=Field(default=None,ge=0)
+    reference_end:float | None=Field(default=None,ge=0)
 
 
 class AudioJob(BaseModel):
@@ -50,11 +53,16 @@ class AudioJob(BaseModel):
     @computed_field
     @property
     def method(self) -> str:
-        return 'gtcrn' if self.preset.startswith('gtcrn-') else 'traditional'
+        return 'voxlock' if self.preset.startswith('voxlock-') else 'gtcrn' if self.preset.startswith('gtcrn-') else 'traditional'
+
+    @computed_field
+    @property
+    def gain_db(self)->int:
+        return int(self.preset.rsplit('-g',1)[1]) if '-g' in self.preset else 0
 
     @field_serializer('preset')
     def preset_name(self,value):
-        return value.removeprefix('gtcrn-')
+        return value.removeprefix('gtcrn-').removeprefix('voxlock-').split('-g')[0]
 
 
 def migrate_enhancement(connection):
@@ -187,17 +195,23 @@ class AudioWorker:
             if lesson is None or not (self.root/'originals'/lesson['storage_name']).is_file():raise ValueError('Original audio is missing')
             executable=imageio_ffmpeg.get_ffmpeg_exe();source=self.root/'originals'/lesson['storage_name']
             ffmpeg_version=subprocess.run([executable,'-version'],capture_output=True,text=True,check=True,timeout=10).stdout.splitlines()[0]
-            ai=job['preset'].startswith('gtcrn-')
-            engine=('GTCRN / sherpa-onnx '+version('sherpa-onnx')+'; '+ffmpeg_version) if ai else ffmpeg_version
+            ai=job['preset'].startswith(('gtcrn-','voxlock-'));vox=job['preset'].startswith('voxlock-')
+            engine=(('VoxLock' if vox else 'GTCRN')+' / sherpa-onnx '+version('sherpa-onnx')+'; '+ffmpeg_version) if ai else ffmpeg_version
             with closing(self.connect()) as c,c:c.execute('UPDATE audio_jobs SET engine=? WHERE id=?',(engine,identifier))
             common=[executable,'-nostdin','-v','error','-y','-protocol_whitelist','file,pipe']
             if ai:
-                recipe=json.loads(job['filter']);model=self.models.require('gtcrn')
+                recipe=json.loads(job['filter']);model=self.models.require('voxlock-chunk' if vox else 'gtcrn')
                 with TemporaryDirectory(prefix='gtcrn-',dir=self.outputs) as temporary:
                     decoded=Path(temporary)/'input.wav'
                     command=common+['-i',str(source),'-map','0:a:0','-vn','-ac','1','-ar','16000','-c:a','pcm_s16le','-progress','pipe:1','-nostats',str(decoded)]
                     if not self.run_stage(command,identifier,lesson['duration_seconds'],0,10):return
-                    command=worker_command()+['--input',str(decoded),'--output',str(wave_partial),'--model',str(model),'--strength',str(recipe['strength'])]
+                    extra=[]
+                    if vox:
+                        reference=Path(temporary)/'reference.wav'
+                        command=common+['-ss',str(recipe['reference_start']),'-i',str(decoded),'-t',str(recipe['reference_end']-recipe['reference_start']),'-c:a','pcm_s16le',str(reference)]
+                        if not self.run_stage(command,identifier,recipe['reference_end']-recipe['reference_start'],10,1):return
+                        extra=['--enroll-model',str(self.models.require('voxlock-enroll')),'--voice-sample',str(reference)]
+                    command=worker_command()+['--input',str(decoded),'--output',str(wave_partial),'--model',str(model),'--strength',str(recipe['strength'])]+extra
                     if not self.run_stage(command,identifier,lesson['duration_seconds'],10,75):return
                     command=common+['-i',str(wave_partial),'-af',recipe['postfilter'],'-map_metadata','-1','-c:a','libmp3lame','-b:a','96k','-progress','pipe:1','-nostats',str(partial)]
                     if not self.run_stage(command,identifier,lesson['duration_seconds'],85,14):return
@@ -233,12 +247,14 @@ def enhancement_router(root, connect, authenticate, worker):
 
     def require_lesson(identifier):
         with closing(connect()) as connection:
-            if not connection.execute('SELECT 1 FROM lessons WHERE id=?', (str(identifier),)).fetchone():
-                raise HTTPException(404, 'Lesson not found')
+            row=connection.execute('SELECT * FROM lessons WHERE id=?', (str(identifier),)).fetchone()
+            if not row:raise HTTPException(404, 'Lesson not found')
+            return dict(row)
 
     @router.post('/lessons/{lesson_id}/enhancements', response_model=AudioJob, status_code=202)
     def create_job(lesson_id: UUID, options: EnhancementInput):
-        require_lesson(lesson_id)
+        lesson=require_lesson(lesson_id)
+        if options.method!='voxlock' and (options.reference_start is not None or options.reference_end is not None):raise HTTPException(422,'Il campione vocale serve solo per l’isolamento docente')
         key=options.preset
         recipe=PRESETS[options.preset]
         if options.method=='gtcrn':
@@ -247,6 +263,18 @@ def enhancement_router(root, connect, authenticate, worker):
             recipe=json.dumps({'model':'gtcrn','sha256':CATALOG['gtcrn']['sha256'],'version':1,
                                'strength':{'light':.35,'balanced':.7,'strong':1.0}[options.preset],
                                'postfilter':'dynaudnorm=f=250:g=15:p=0.9:m=5,alimiter=limit=0.95:level=false:latency=true'},sort_keys=True)
+        if options.method=='voxlock':
+            if options.preset!='balanced' or options.reference_start is None or options.reference_end is None or not 3<=options.reference_end-options.reference_start<=30 or options.reference_end>lesson['duration_seconds']:
+                raise HTTPException(422,'Scegli un campione di 3–30 secondi entro la lezione, in cui parla solo il docente')
+            worker.models.require('voxlock-chunk');worker.models.require('voxlock-enroll')
+            key='voxlock-balanced'
+            recipe=json.dumps({'model':'voxlock','sha256':CATALOG['voxlock-chunk']['sha256'],'enroll_sha256':CATALOG['voxlock-enroll']['sha256'],'version':1,'strength':1,'reference_start':options.reference_start,'reference_end':options.reference_end,'postfilter':'dynaudnorm=f=250:g=15:p=0.9:m=5,alimiter=limit=0.95:level=false:latency=true'},sort_keys=True)
+        if options.gain_db:
+            key+='-g'+str(options.gain_db)
+            gain=f',volume={options.gain_db}dB,alimiter=limit=0.95:level=false:latency=true'
+            if options.method=='traditional':recipe+=gain
+            else:
+                data=json.loads(recipe);data['postfilter']+=gain;recipe=json.dumps(data,sort_keys=True)
         with worker.lock:
             with closing(connect()) as connection, connection:
                 row = connection.execute("SELECT * FROM audio_jobs WHERE lesson_id=? AND preset=? AND (status IN ('queued','running') OR (status='completed' AND filter=?)) ORDER BY created_at DESC LIMIT 1",

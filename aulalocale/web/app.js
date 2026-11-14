@@ -90,7 +90,7 @@ async function selectSubject(id) {
   const subject = subjects.find(s => s.id === id);
   $('subject-title').textContent = subject.title;
   $('subject-description').textContent = subject.description || 'Le registrazioni e i materiali di questa materia.';
-  $('open-upload').disabled = false;
+  $('open-upload').disabled = false;$('open-recording').disabled=false;
   $('player').pause(); $('player').removeAttribute('src'); $('player').load(); $('player-panel').hidden = true;
   lessons = []; renderLessons(); $('empty').hidden = true; $('list-status').textContent = 'Caricamento…';
   try {
@@ -105,7 +105,7 @@ async function openWorkspace() {
   renderSubjects();
   if (subjects.length) await selectSubject(subjects[0].id);
   else {
-    selected = null; lessons = []; renderLessons(); $('open-upload').disabled = true;
+    selected = null; lessons = []; renderLessons(); $('open-upload').disabled = true;$('open-recording').disabled=true;
     $('subject-title').textContent = 'Il tuo spazio di studio';
     $('subject-description').textContent = 'Una materia alla volta, una lezione dopo l’altra.';
   }
@@ -216,6 +216,8 @@ $('upload-form').onsubmit = async event => {
 function resetAudioState() {
   if (typeof resetStudy === 'function') resetStudy();
   currentLesson = null; currentAudioJob = null; audioSourceVersion++;
+  $('audio-method').value='gtcrn'; $('audio-preset').value='balanced'; $('audio-gain').value='0';
+  $('voice-reference').hidden=true; $('audio-preset').closest('label').hidden=false;
   clearTimeout(audioPollTimer);
 }
 function renderAudioJob() {
@@ -243,10 +245,10 @@ function renderAudioJob() {
 async function refreshAudioJob() {
   clearTimeout(audioPollTimer);
   if (!currentLesson) return;
-  const id = currentLesson.id, preset = $('audio-preset').value, method=$('audio-method').value;
+  const id = currentLesson.id, preset = $('audio-preset').value, method=$('audio-method').value,options=enhancementOptions();
   const jobs = await request(`/api/v1/lessons/${encodeURIComponent(id)}/enhancements`);
-  if (!currentLesson || currentLesson.id !== id || $('audio-preset').value !== preset || $('audio-method').value !== method) return;
-  currentAudioJob = jobs.find(job => job.preset === preset && (job.method || 'traditional') === method) || null;
+  if (!currentLesson || currentLesson.id !== id || $('audio-preset').value !== preset || $('audio-method').value !== method || JSON.stringify(enhancementOptions()) !== JSON.stringify(options)) return;
+  currentAudioJob = jobs.find(job => job.preset === preset && (job.method || 'traditional') === method && (job.gain_db || 0)===options.gain_db && (method!=='voxlock' || (()=>{try{const recipe=JSON.parse(job.filter);return recipe.reference_start===options.reference_start && recipe.reference_end===options.reference_end;}catch{return false;}})())) || null;
   renderAudioJob();
   if (currentAudioJob && ['queued','running','interrupted'].includes(currentAudioJob.status)) {
     audioPollTimer = setTimeout(() => refreshAudioJob().catch(e => notify(e.message,true)),1200);
@@ -275,7 +277,7 @@ async function openLesson(lesson, autoplay = false) {
   resetAudioState(); currentLesson = lesson; renderLessons();
   $('playing-title').textContent = lesson.title; $('player-panel').hidden = false;
   renderAudioJob(); switchAudio(false,false,autoplay);
-  try { await refreshAudioJob(); await loadStudy(); } catch(e) { notify(e.message,true); }
+  try { await refreshAudioJob(); await loadStudy();await loadSpeakers(); } catch(e) { notify(e.message,true); }
   return true;
 }
 $('source-original').onclick = () => switchAudio(false);
@@ -289,7 +291,7 @@ $('enhance-audio').onclick = async () => {
   const id = currentLesson.id;
   $('enhance-audio').disabled = true;
   try {
-    const job = await request(`/api/v1/lessons/${encodeURIComponent(id)}/enhancements`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({preset:$('audio-preset').value,method:$('audio-method').value})});
+    const job = await request(`/api/v1/lessons/${encodeURIComponent(id)}/enhancements`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(enhancementOptions())});
     if (currentLesson && currentLesson.id === id) { await refreshAudioJob(); }
     notify(job.status === 'completed' ? 'La versione migliorata è già pronta.' : 'Elaborazione avviata. Puoi continuare a usare l’archivio.');
   } catch(e) { notify(e.message,true); renderAudioJob(); }
@@ -321,4 +323,8 @@ bootstrapWorkspace().catch(e => { if (!$('login-view').hidden) return; notify(e.
 
 $('lesson-search').oninput = renderLessons;
 
-$('audio-method').onchange = $('audio-preset').onchange;
+function enhancementOptions(){const result={preset:$('audio-preset').value,method:$('audio-method').value,gain_db:Number($('audio-gain').value)};if(result.method==='voxlock'){result.reference_start=Number($('reference-start').value);result.reference_end=Number($('reference-end').value);}return result;}
+async function enhancementChanged(){const isolation=$('audio-method').value==='voxlock';$('voice-reference').hidden=!isolation;$('audio-preset').closest('label').hidden=isolation;if(isolation){$('audio-preset').value='balanced';if(currentLesson && Number($('reference-end').value)>currentLesson.duration_seconds)$('reference-end').value=currentLesson.duration_seconds;}switchAudio(false);currentAudioJob=null;renderAudioJob();try{await refreshAudioJob();}catch(e){notify(e.message,true);}}
+async function setIsolationReference(start,end){$('audio-method').value='voxlock';$('reference-start').value=Number(start.toFixed(1));$('reference-end').value=Number(Math.min(currentLesson.duration_seconds,end).toFixed(1));await enhancementChanged();$('voice-reference').scrollIntoView({block:'center',behavior:'smooth'});}
+for(const id of ['audio-method','audio-preset','audio-gain','reference-start','reference-end'])$(id).onchange=enhancementChanged;
+$('reference-from-player').onclick=()=>{if(currentLesson){const start=Math.min($('player').currentTime,Math.max(0,currentLesson.duration_seconds-3));setIsolationReference(start,Math.min(start+10,currentLesson.duration_seconds));}};

@@ -137,7 +137,7 @@ class StudyEngine:
     def cancelled(self,identifier):
         return self.worker.stop_event.is_set() or self.get(identifier)['status']=='cancelled'
 
-    def process(self,command,identifier):
+    def process(self,command,identifier,progress_path=None):
         # No network flags or endpoints supplied to native inference runtimes.
         with self.worker.lock:
             if self.cancelled(identifier):raise InterruptedError()
@@ -147,6 +147,9 @@ class StudyEngine:
             try:
                 code=self.worker.process.wait(timeout=.5);break
             except subprocess.TimeoutExpired:
+                if progress_path and progress_path.is_file():
+                    try:self.update(identifier,'running',min(99,10+float(progress_path.read_text())*85))
+                    except (ValueError,OSError):pass
                 if self.cancelled(identifier):
                     self.worker.process.terminate()
                     try:self.worker.process.wait(timeout=5)
@@ -165,6 +168,7 @@ class StudyEngine:
                 self.update(identifier,'running')
             with TemporaryDirectory(prefix='study-',dir=self.root) as temp:
                 if job['kind']=='transcription':self.transcribe(job,Path(temp))
+                elif job['kind']=='speakers':self.speakers.execute(job,Path(temp),self)
                 else:self.generate_notes(job,Path(temp))
             with self.worker.lock:
                 if self.cancelled(identifier):raise InterruptedError()

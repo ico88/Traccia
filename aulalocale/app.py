@@ -52,6 +52,9 @@ def create_app(data_dir: Path | None = None, token: str | None = None, bootstrap
     worker.models = models
     study = StudyEngine(root, connect, worker, models)
     worker.study = study
+    from .speakers import SpeakerService,speakers_router
+    from .recording import recording_router
+    speakers=SpeakerService(root,connect,worker,models);study.speakers=speakers
 
     @asynccontextmanager
     async def lifespan(application):
@@ -73,7 +76,7 @@ def create_app(data_dir: Path | None = None, token: str | None = None, bootstrap
             worker.stop()
             models.close()
 
-    api = FastAPI(title="AulaLocale", version="0.8.0", lifespan=lifespan,
+    api = FastAPI(title="AulaLocale", version="0.9.0", lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
     bearer = HTTPBearer(auto_error=False)
 
@@ -139,6 +142,9 @@ def create_app(data_dir: Path | None = None, token: str | None = None, bootstrap
         response.delete_cookie(session_cookie, path="/api/v1", httponly=True, samesite="strict")
         response.headers["Cache-Control"] = "no-store"
 
+    api.include_router(speakers_router(speakers,study,authenticate))
+    api.include_router(recording_router(root,connect,authenticate))
+
     web = Path(__file__).parent / "web"
     api.mount("/static", StaticFiles(directory=web), name="static")
 
@@ -146,7 +152,7 @@ def create_app(data_dir: Path | None = None, token: str | None = None, bootstrap
     def interface():
         return FileResponse(web / "index.html", headers={
             "Cache-Control": "no-store",
-            "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; media-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+            "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; media-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
             "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"})
 
     @api.get("/health")

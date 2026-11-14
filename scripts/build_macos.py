@@ -6,6 +6,7 @@ import shutil
 import tempfile
 import subprocess
 import sys
+import plistlib
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -19,15 +20,18 @@ def main():
     command=[sys.executable,'-m','PyInstaller','--noconfirm','--windowed','--onedir','--name','AulaLocale',
              '--osx-bundle-identifier','it.aulalocale.desktop','--distpath',str(output),'--workpath',str(ROOT/'work'/'pyinstaller'),
              '--specpath',str(ROOT/'work'),'--paths',str(ROOT),
-             '--collect-all','imageio_ffmpeg','--collect-all','mutagen','--collect-all','sherpa_onnx','--collect-all','uvicorn',
+             '--hidden-import','webview.platforms.cocoa','--hidden-import','WebKit','--hidden-import','AppKit','--hidden-import','Foundation','--collect-all','webview','--collect-all','imageio_ffmpeg','--collect-all','mutagen','--collect-all','sherpa_onnx','--collect-all','uvicorn',
              '--add-data',f'{ROOT / "aulalocale" / "web"}:aulalocale/web']
-    for dependency in ['mutagen','imageio-ffmpeg','Pillow','fastapi','uvicorn','starlette','pydantic','certifi','numpy','sherpa-onnx','sherpa-onnx-core']:
+    for dependency in ['mutagen','imageio-ffmpeg','Pillow','fastapi','uvicorn','starlette','pydantic','certifi','numpy','sherpa-onnx','sherpa-onnx-core','pywebview','pyobjc-core','pyobjc-framework-Cocoa','pyobjc-framework-WebKit']:
         command+=['--copy-metadata',dependency]
     if (ROOT/'runtimes'/'licenses').is_dir():command+=['--add-data',f'{ROOT / "runtimes" / "licenses"}:runtimes/licenses']
     for binary in binaries:command+=['--add-binary',f'{binary}:runtimes']
     command.append(str(ROOT/'scripts'/'desktop_entry.py'))
     subprocess.run(command,check=True)
     bundle=output/'AulaLocale.app'
+    info=bundle/'Contents'/'Info.plist'
+    data=plistlib.loads(info.read_bytes());data.update({'CFBundleShortVersionString':'0.9.0','CFBundleVersion':'9','NSMicrophoneUsageDescription':'AulaLocale usa il microfono solo quando avvii una registrazione della lezione. L’audio resta sul tuo dispositivo.','NSHighResolutionCapable':True,'NSAppTransportSecurity':{'NSAllowsLocalNetworking':True}})
+    info.write_bytes(plistlib.dumps(data))
     # Finder/iCloud may reattach these two packaging attributes while signing.
     # Retry only that specific error; never clear quarantine or bypass verification.
     for attempt in range(3):
@@ -45,8 +49,8 @@ def main():
             stage=Path(temporary)
             shutil.copytree(bundle,stage/'AulaLocale.app',symlinks=True)
             (stage/'Applicazioni').symlink_to('/Applications')
-            (stage/'LEGGIMI.txt').write_text('AulaLocale 0.8 - build di sviluppo Apple Silicon.\nTrascina AulaLocale in Applicazioni e avviala. I modelli si scaricano dalla schermata Modelli locali.\nBuild ad hoc non notarizzata, destinata ai test locali. Nessuna registrazione inclusa.\nSorgenti: https://github.com/ico88/aulalocale/tree/sviluppo\n')
-            subprocess.run(['hdiutil','create','-ov','-volname','AulaLocale','-srcfolder',str(stage),'-format','UDZO',str(output/'AulaLocale-0.8-AppleSilicon-sviluppo.dmg')],check=True)
+            (stage/'LEGGIMI.txt').write_text('AulaLocale 0.9 - build di sviluppo Apple Silicon.\nTrascina AulaLocale in Applicazioni e avviala. I modelli si scaricano dalla schermata Modelli locali.\nBuild ad hoc non notarizzata, destinata ai test locali. Nessuna registrazione inclusa.\nSorgenti: https://github.com/ico88/aulalocale/tree/sviluppo\n')
+            subprocess.run(['hdiutil','create','-ov','-volname','AulaLocale','-srcfolder',str(stage),'-format','UDZO',str(output/'AulaLocale-0.9-AppleSilicon-sviluppo.dmg')],check=True)
     if (output/'AulaLocale').is_dir():shutil.rmtree(output/'AulaLocale')
     print('Development .app built. Distribution signing and notarization are not included.')
 

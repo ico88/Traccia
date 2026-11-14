@@ -10,12 +10,11 @@ def worker_command():
     return [sys.executable,'-m','aulalocale.ai_denoise']
 
 
-def enhance(source:Path,target:Path,model:Path,strength:float):
+def enhance(source:Path,target:Path,model:Path,strength:float,enroll_model:Path | None=None,voice_sample:Path | None=None):
     import numpy as np
     import sherpa_onnx
-    config=sherpa_onnx.OnlineSpeechDenoiserConfig(model=sherpa_onnx.OfflineSpeechDenoiserModelConfig(
-        gtcrn=sherpa_onnx.OfflineSpeechDenoiserGtcrnModelConfig(model=str(model)),
-        num_threads=1,provider='cpu',debug=False))
+    options={'voxlock':sherpa_onnx.OfflineSpeechDenoiserVoxLockModelConfig(enroll_model=str(enroll_model),chunk_model=str(model),voice_sample=str(voice_sample))} if enroll_model else {'gtcrn':sherpa_onnx.OfflineSpeechDenoiserGtcrnModelConfig(model=str(model))}
+    config=sherpa_onnx.OnlineSpeechDenoiserConfig(model=sherpa_onnx.OfflineSpeechDenoiserModelConfig(**options,num_threads=1,provider='cpu',debug=False))
     if not config.validate():raise ValueError('Invalid local denoiser configuration')
     denoiser=sherpa_onnx.OnlineSpeechDenoiser(config)
     if denoiser.sample_rate!=16000:raise ValueError('Unexpected denoiser sample rate')
@@ -27,6 +26,7 @@ def enhance(source:Path,target:Path,model:Path,strength:float):
         def write(samples):
             nonlocal written
             wet=np.asarray(samples,dtype=np.float32)
+            if enroll_model:wet=wet[:max(0,total-written)]
             if not len(wet):return
             original=np.frombuffer(dry.readframes(len(wet)),dtype='<i2').astype(np.float32)/32768
             if len(original)!=len(wet):raise ValueError('Denoiser changed audio length')
@@ -49,7 +49,9 @@ def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--input',type=Path,required=True);parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--model',type=Path,required=True);parser.add_argument('--strength',type=float,default=.7)
+    parser.add_argument('--enroll-model',type=Path);parser.add_argument('--voice-sample',type=Path)
     args=parser.parse_args(argv)
+    if bool(args.enroll_model)!=bool(args.voice_sample):parser.error('Supply both enrollment model and voice sample')
     if not 0<=args.strength<=1:parser.error('strength must be between 0 and 1')
-    enhance(args.input,args.output,args.model,args.strength)
+    enhance(args.input,args.output,args.model,args.strength,args.enroll_model,args.voice_sample)
 if __name__=='__main__':main()

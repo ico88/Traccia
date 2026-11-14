@@ -86,6 +86,68 @@ def inspect_audio(path: Path, suffix: str):
     return dict(duration_seconds=duration, sample_rate=rate, channels=channels, media_type=media_type)
 
 
+def store_lesson(root,connect,subject_id,file,title,teacher="",lecture_date=None):
+    originals=root/"originals";staging=root/"staging"
+    title = title.strip()
+    if not title:
+        raise HTTPException(422, "Title cannot be blank")
+    filename = (file.filename or "").replace("\\", "/").split("/")[-1]
+    suffix = Path(filename).suffix.lower()
+    if suffix not in FORMATS or len(filename) > 255 or any(ord(c) < 32 for c in filename):
+        raise HTTPException(422, "Use an MP3, WAV, M4A or FLAC file with a valid filename")
+    if file.size is not None and file.size > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "Audio exceeds the 512 MiB limit")
+    staging.mkdir(parents=True, exist_ok=True)
+    originals.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    destination = None
+    committed = False
+    try:
+        digest, size = hashlib.sha256(), 0
+        with NamedTemporaryFile(dir=staging, suffix=suffix, delete=False) as target:
+            temporary = Path(target.name)
+            while chunk := file.file.read(1024 * 1024):
+                size += len(chunk)
+                if size > MAX_UPLOAD_BYTES:
+                    raise HTTPException(413, "Audio exceeds the 512 MiB limit")
+                digest.update(chunk)
+                target.write(chunk)
+        checksum = digest.hexdigest()
+        with closing(connect()) as connection:
+            existing = connection.execute(
+                "SELECT id FROM lessons WHERE subject_id=? AND sha256=?",
+                (str(subject_id), checksum)).fetchone()
+        if existing:
+            raise HTTPException(409, {"message": "Audio already imported in this subject", "lesson_id": existing["id"]})
+        metadata = inspect_audio(temporary, suffix)
+        identifier = str(uuid4())
+        storage_name = identifier + suffix
+        destination = originals / storage_name
+        record = dict(id=identifier, subject_id=str(subject_id), title=title,
+                      teacher=teacher.strip(), lecture_date=lecture_date.isoformat() if lecture_date else None,
+                      original_filename=filename, sha256=checksum, size_bytes=size,
+                      created_at=datetime.now(timezone.utc).isoformat(),
+                      storage_name=storage_name, **metadata)
+        # Rename on the same filesystem; a failed DB write removes the new file.
+        temporary.replace(destination)
+        with closing(connect()) as connection, connection:
+            connection.execute("""INSERT INTO lessons VALUES (
+                :id,:subject_id,:title,:teacher,:lecture_date,:original_filename,
+                :sha256,:size_bytes,:duration_seconds,:sample_rate,:channels,
+                :media_type,:created_at,:storage_name)""", record)
+        committed = True
+        return record
+    except sqlite3.IntegrityError as error:
+        raise HTTPException(409, "Audio was imported concurrently; refresh the lesson list") from error
+    except OSError as error:
+        raise HTTPException(507, "Unable to store the audio; check disk space and permissions") from error
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+        if destination is not None and not committed:
+            destination.unlink(missing_ok=True)
+
+
 def lessons_router(root, connect, authenticate):
     router = APIRouter(prefix="/api/v1", dependencies=[Depends(authenticate)])
     originals = root / "originals"
@@ -115,64 +177,7 @@ def lessons_router(root, connect, authenticate):
                       teacher: str = Form("", max_length=200),
                       lecture_date: date | None = Form(None)):
         subject_exists(subject_id)
-        title = title.strip()
-        if not title:
-            raise HTTPException(422, "Title cannot be blank")
-        filename = (file.filename or "").replace("\\", "/").split("/")[-1]
-        suffix = Path(filename).suffix.lower()
-        if suffix not in FORMATS or len(filename) > 255 or any(ord(c) < 32 for c in filename):
-            raise HTTPException(422, "Use an MP3, WAV, M4A or FLAC file with a valid filename")
-        if file.size is not None and file.size > MAX_UPLOAD_BYTES:
-            raise HTTPException(413, "Audio exceeds the 512 MiB limit")
-        staging.mkdir(parents=True, exist_ok=True)
-        originals.mkdir(parents=True, exist_ok=True)
-        temporary = None
-        destination = None
-        committed = False
-        try:
-            digest, size = hashlib.sha256(), 0
-            with NamedTemporaryFile(dir=staging, suffix=suffix, delete=False) as target:
-                temporary = Path(target.name)
-                while chunk := file.file.read(1024 * 1024):
-                    size += len(chunk)
-                    if size > MAX_UPLOAD_BYTES:
-                        raise HTTPException(413, "Audio exceeds the 512 MiB limit")
-                    digest.update(chunk)
-                    target.write(chunk)
-            checksum = digest.hexdigest()
-            with closing(connect()) as connection:
-                existing = connection.execute(
-                    "SELECT id FROM lessons WHERE subject_id=? AND sha256=?",
-                    (str(subject_id), checksum)).fetchone()
-            if existing:
-                raise HTTPException(409, {"message": "Audio already imported in this subject", "lesson_id": existing["id"]})
-            metadata = inspect_audio(temporary, suffix)
-            identifier = str(uuid4())
-            storage_name = identifier + suffix
-            destination = originals / storage_name
-            record = dict(id=identifier, subject_id=str(subject_id), title=title,
-                          teacher=teacher.strip(), lecture_date=lecture_date.isoformat() if lecture_date else None,
-                          original_filename=filename, sha256=checksum, size_bytes=size,
-                          created_at=datetime.now(timezone.utc).isoformat(),
-                          storage_name=storage_name, **metadata)
-            # Rename on the same filesystem; a failed DB write removes the new file.
-            temporary.replace(destination)
-            with closing(connect()) as connection, connection:
-                connection.execute("""INSERT INTO lessons VALUES (
-                    :id,:subject_id,:title,:teacher,:lecture_date,:original_filename,
-                    :sha256,:size_bytes,:duration_seconds,:sample_rate,:channels,
-                    :media_type,:created_at,:storage_name)""", record)
-            committed = True
-            return record
-        except sqlite3.IntegrityError as error:
-            raise HTTPException(409, "Audio was imported concurrently; refresh the lesson list") from error
-        except OSError as error:
-            raise HTTPException(507, "Unable to store the audio; check disk space and permissions") from error
-        finally:
-            if temporary is not None:
-                temporary.unlink(missing_ok=True)
-            if destination is not None and not committed:
-                destination.unlink(missing_ok=True)
+        return store_lesson(root,connect,subject_id,file,title,teacher,lecture_date)
 
     @router.get("/subjects/{subject_id}/lessons", response_model=list[Lesson])
     def list_lessons(subject_id: UUID, limit: int = 50, offset: int = 0):

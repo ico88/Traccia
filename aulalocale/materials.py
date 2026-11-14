@@ -159,6 +159,9 @@ def materials_router(root,connect,authenticate,worker):
                         names+=['enhanced/'+identifier+'.mp3' for identifier in jobs]
                         names+=['enhanced/'+identifier+'.wav' for identifier in jobs if (root/'enhanced'/(identifier+'.wav')).is_file()]
                         names+=['materials/'+r[0] for r in c.execute('SELECT filename FROM materials')]
+                        voice_jobs=[r[0] for r in c.execute("SELECT id FROM study_jobs WHERE kind='speakers' AND status='completed'")]
+                        names+=['speakers/'+identifier+'.json' for identifier in voice_jobs]
+                        names+=['speakers/'+identifier+'.edits.json' for identifier in voice_jobs if (root/'speakers'/(identifier+'.edits.json')).is_file()]
                     entries={'aulalocale.sqlite3':snapshot,**{name:root/name for name in names}}
                     manifest={'schema':5,'files':{}}
                     with zipfile.ZipFile(path,'w',compression=zipfile.ZIP_STORED) as bundle:

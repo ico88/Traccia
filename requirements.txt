@@ -10,3 +10,4 @@ Pillow==13.0.0
 numpy==2.4.6
 sherpa-onnx==2.0.1
 sherpa-onnx-core==2.0.1
+pywebview==6.2.1; sys_platform == 'darwin'

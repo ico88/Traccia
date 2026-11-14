@@ -78,3 +78,14 @@ def test_ai_api_result_source_and_backup(tmp_path,monkeypatch):
         import zipfile
         with zipfile.ZipFile(io.BytesIO(client.get('/api/v1/backup',headers=AUTH).content)) as backup:
             assert 'enhanced/'+job['id']+'.wav' in backup.namelist()
+
+
+def test_isolation_requires_valid_reference_and_volume_is_bounded(tmp_path):
+    with TestClient(create_app(tmp_path,TOKEN)) as client:
+        sid=client.post('/api/v1/subjects',headers=AUTH,json={'title':'Test'}).json()['id']
+        lid=client.post(f'/api/v1/subjects/{sid}/lessons',headers=AUTH,data={'title':'Test'},files={'file':('x.wav',audio())}).json()['id']
+        route=f'/api/v1/lessons/{lid}/enhancements'
+        assert client.post(route,headers=AUTH,json={'method':'voxlock','reference_start':0,'reference_end':3}).status_code==422
+        assert client.post(route,headers=AUTH,json={'gain_db':13}).status_code==422
+        assert client.post(route,headers=AUTH,json={'reference_start':0,'reference_end':1}).status_code==422
+        assert client.get(route,headers=AUTH).json()==[]

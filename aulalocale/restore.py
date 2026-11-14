@@ -29,7 +29,7 @@ def restore(backup:Path,destination:Path):
         for name,digest in expected.items():
             path=PurePosixPath(name)
             if path.is_absolute() or '..' in path.parts or '\\' in name or len(path.parts)>2:raise ValueError('Unsafe backup path')
-            if name!='aulalocale.sqlite3' and (len(path.parts)!=2 or path.parts[0] not in {'originals','enhanced','materials'}):raise ValueError('Unexpected backup file')
+            if name!='aulalocale.sqlite3' and (len(path.parts)!=2 or path.parts[0] not in {'originals','enhanced','materials','speakers'}):raise ValueError('Unexpected backup file')
             if bundle.getinfo(name).external_attr>>16 & 0o170000 == 0o120000:raise ValueError('Symbolic links are not allowed')
             target=staging.joinpath(*path.parts);target.parent.mkdir(exist_ok=True)
             checksum=hashlib.sha256()
@@ -43,6 +43,8 @@ def restore(backup:Path,destination:Path):
             for identifier,filename,checksum in c.execute('SELECT id,storage_name,sha256 FROM lessons'):
                 if Path(filename).name!=filename or '\\' in filename or Path(filename).stem!=identifier or 'originals/'+filename not in expected or expected['originals/'+filename]!=checksum:
                     raise ValueError('Invalid original asset reference')
+            for (identifier,) in c.execute("SELECT id FROM study_jobs WHERE kind='speakers' AND status='completed'"):
+                if 'speakers/'+identifier+'.json' not in expected:raise ValueError('Missing speaker analysis')
             for identifier,filename in c.execute('SELECT id,filename FROM materials'):
                 if filename!=identifier+'.png' or 'materials/'+filename not in expected:raise ValueError('Invalid image reference')
         if destination.exists():raise ValueError('Destination appeared during restore')

@@ -70,3 +70,7 @@ Prove con Qwen locale su due lezioni sintetiche: fusione nel capitolo esistente 
 75 test automatici superati: pianificazione incrementale, fonti collegate ricostruite dopo una correzione, consolidamento con fonti di entrambe le lezioni, rifiuto della perdita di riferimenti, conservazione delle parti manuali, blocco dell’accettazione senza controllo delle sostituzioni e segnalazioni di contrasto negli export. È coperto anche il caso di metadati precedenti su un capitolo manuale, che non deve riavviare inutilmente la generazione.
 
 Pacchetto Mac 0.8 verificato: avvio del server incluso, risorse web, GTCRN, Whisper, proposta Qwen con la nuova pianificazione e arresto regolare nell’archivio di prova separato. Firma ad hoc verificata, non notarizzata. Nessuna prova su un secondo Mac o server i7.
+
+## Sviluppo 0.9 — audio e finestra Mac
+
+82 test backend superati, incluso il ripristino delle assegnazioni manuali dei parlanti. Test del ricampionamento AudioWorklet a 16/44,1/48 kHz superati. Finestra Mac WebKit verificata visivamente nel pacchetto. Prova del pacchetto senza interfaccia: upload, FFmpeg, GTCRN, Whisper sul WAV migliorato, proposta Qwen e arresto completati. Dettagli e limiti in [audio-desktop.md](audio-desktop.md).

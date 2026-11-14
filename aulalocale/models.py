@@ -8,6 +8,7 @@ import json
 import os
 import shutil
 import ssl
+import tarfile
 
 import certifi
 from fastapi import APIRouter, Depends, HTTPException
@@ -28,6 +29,8 @@ CATALOG = {
         'sha256':'e77603ac0c23dac3227dd2d7135b3a585cbee2679048aecfa886657d3ae1b534','license':'MIT'},
 
 }
+
+CATALOG.update({'speaker-segmentation': {'name': 'Analisi parlanti · segmentazione', 'task': 'speakers', 'repo': 'csukuangfj/sherpa-onnx-pyannote-segmentation-3-0', 'revision': '9403a6902bb58e3d5ae8c7e77c3422de279db2e0', 'file': 'speaker-segmentation.onnx', 'url': 'https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0/resolve/9403a6902bb58e3d5ae8c7e77c3422de279db2e0/model.int8.onnx', 'bytes': 1540506, 'sha256': 'd582f4b4c6b48205de7e0643c57df0df5615a3c176189be3fc461e9d18827b5d', 'license': 'MIT', 'requires': ['speaker-embedding']}, 'speaker-embedding': {'name': 'Analisi parlanti · confronto delle voci', 'task': 'speakers', 'repo': 'modelscope/3D-Speaker', 'revision': 'sherpa-release-1a331345', 'url': 'https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx', 'file': 'speaker-embedding.onnx', 'bytes': 39593761, 'sha256': '1a331345f04805badbb495c775a6ddffcdd1a732567d5ec8b3d5749e3c7a5e4b', 'license': 'Apache-2.0'}, 'voxlock-enroll': {'name': 'Isolamento docente · campione vocale', 'task': 'enhancement', 'repo': 'arbazsiddiqui/voxlock', 'revision': 'sherpa-release-5d06048c', 'file': 'voxlock-enroll.onnx', 'bytes': 12476014, 'sha256': '5d06048c156bb8cd422d29848e6d38fb26a7b39f6f7fd92eccf2a6ed1ce003c6', 'license': 'Apache-2.0', 'archive': {'url': 'https://github.com/k2-fsa/sherpa-onnx/releases/download/speech-enhancement-models/sherpa-onnx-voxlock-int8.tar.bz2', 'bytes': 72508647, 'sha256': 'bcb947f9e8676d3e963f6048b0088505c84f0843bfdc88cb26dde3264d81570b', 'member': 'sherpa-onnx-voxlock-int8/enroll.onnx'}}, 'voxlock-chunk': {'name': 'Isolamento docente · modello principale', 'task': 'enhancement', 'repo': 'arbazsiddiqui/voxlock', 'revision': 'sherpa-release-df61a9d0', 'file': 'voxlock-chunk.onnx', 'bytes': 66608910, 'sha256': 'df61a9d0062b0adbcf1182302b1eb8b815f15ac47ea4923e8e164c1aff64121d', 'license': 'Apache-2.0', 'archive': {'url': 'https://github.com/k2-fsa/sherpa-onnx/releases/download/speech-enhancement-models/sherpa-onnx-voxlock-int8.tar.bz2', 'bytes': 72508647, 'sha256': 'bcb947f9e8676d3e963f6048b0088505c84f0843bfdc88cb26dde3264d81570b', 'member': 'sherpa-onnx-voxlock-int8/chunk_int8.onnx'}, 'requires': ['voxlock-enroll']}})
 
 
 def runtime_path(name):
@@ -79,6 +82,7 @@ class ModelManager:
 
     def start(self, identifier):
         self.path(identifier)
+        for dependency in CATALOG[identifier].get('requires',[]):self.start(dependency)
         with self.lock:
             if self.installed(identifier) or self.states.get(identifier,{}).get('status') in ('queued','downloading','verifying'):
                 return
@@ -91,26 +95,31 @@ class ModelManager:
 
     def download(self, identifier):
         model=CATALOG[identifier]; path=self.path(identifier)
+        transfer=model.get('archive',model)
+        download_path=self.directory/('.cache-'+transfer['sha256']+'.tar.bz2') if 'archive' in model else path
         self.directory.mkdir(parents=True,exist_ok=True)
-        partial=path.with_suffix(path.suffix+'.part')
+        partial=download_path.with_suffix(download_path.suffix+'.part')
         try:
+            if 'archive' in model and download_path.is_file():
+                if hashlib.sha256(download_path.read_bytes()).hexdigest()==transfer['sha256']:shutil.copyfile(download_path,partial)
+                else:download_path.unlink()
             offset=partial.stat().st_size if partial.exists() else 0
-            if offset > model['bytes']: partial.unlink(); offset=0
-            if shutil.disk_usage(self.directory).free < model['bytes']-offset+100*1024*1024:
+            if offset > transfer['bytes']: partial.unlink(); offset=0
+            if shutil.disk_usage(self.directory).free < transfer['bytes']-offset+model['bytes']+100*1024*1024:
                 raise ValueError('Spazio insufficiente per il modello')
-            if offset < model['bytes']:
-                url=model.get('url') or f"https://huggingface.co/{model['repo']}/resolve/{model['revision']}/{model['file']}"
+            if offset < transfer['bytes']:
+                url=transfer.get('url') or f"https://huggingface.co/{model['repo']}/resolve/{model['revision']}/{model['file']}"
                 headers={'Range':f'bytes={offset}-'} if offset else {}
                 with urlopen(Request(url,headers=headers),context=ssl.create_default_context(cafile=certifi.where()),timeout=20) as response:
                     if response.status != 206: offset=0
-                    elif response.headers.get('Content-Range','').split('/')[0] != f'bytes {offset}-{model["bytes"]-1}':
+                    elif response.headers.get('Content-Range','').split('/')[0] != f'bytes {offset}-{transfer["bytes"]-1}':
                         raise ValueError('Intervallo di download inatteso')
                     with partial.open('ab' if offset else 'wb') as output:
                         while not self.stop.is_set():
                             chunk=response.read(1024*1024)
                             if not chunk: break
                             offset+=len(chunk)
-                            if offset>model['bytes']: raise ValueError('Dimensione del modello inattesa')
+                            if offset>transfer['bytes']: raise ValueError('Dimensione del modello inattesa')
                             output.write(chunk)
                             with self.lock: self.states[identifier]={'status':'downloading','downloaded':offset,'error':None}
                 if self.stop.is_set(): return
@@ -118,10 +127,20 @@ class ModelManager:
             digest=hashlib.sha256()
             with partial.open('rb') as downloaded:
                 for chunk in iter(lambda:downloaded.read(4*1024*1024),b''): digest.update(chunk)
-            if partial.stat().st_size!=model['bytes'] or digest.hexdigest()!=model['sha256']:
+            if partial.stat().st_size!=transfer['bytes'] or digest.hexdigest()!=transfer['sha256']:
                 partial.unlink(missing_ok=True)
                 raise ValueError('Verifica SHA-256 fallita: riscaricare il modello')
-            partial.replace(path)
+            if 'archive' in model:
+                partial.replace(download_path)
+                extracted=path.with_suffix(path.suffix+'.part')
+                with tarfile.open(download_path) as archive:
+                    member=archive.getmember(transfer['member'])
+                    if not member.isfile() or member.size!=model['bytes']:raise ValueError('File modello inatteso nell’archivio')
+                    with archive.extractfile(member) as source,extracted.open('wb') as target:shutil.copyfileobj(source,target)
+                if hashlib.sha256(extracted.read_bytes()).hexdigest()!=model['sha256']:
+                    extracted.unlink();raise ValueError('Verifica del modello estratto fallita')
+                extracted.replace(path)
+            else:partial.replace(path)
             path.with_suffix(path.suffix+'.verified.json').write_text(json.dumps({'sha256':model['sha256'],'revision':model['revision'],'mtime_ns':path.stat().st_mtime_ns}))
             with self.lock: self.states[identifier]={'status':'installed','downloaded':model['bytes'],'error':None}
         except Exception as error:
@@ -133,7 +152,7 @@ def models_router(manager,authenticate):
     router=APIRouter(prefix='/api/v1',dependencies=[Depends(authenticate)])
     @router.get('/models')
     def models():
-        return {'models':manager.status(),'runtimes':{'transcription':bool(runtime_path('whisper-cli')),'notes':bool(runtime_path('llama-cli')),'enhancement':True}}
+        return {'models':manager.status(),'runtimes':{'transcription':bool(runtime_path('whisper-cli')),'notes':bool(runtime_path('llama-cli')),'enhancement':True,'speakers':True}}
     @router.post('/models/{identifier}/download',status_code=202)
     def download(identifier:str):
         manager.start(identifier)

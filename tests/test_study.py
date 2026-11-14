@@ -120,7 +120,7 @@ def test_models_download_is_explicit(tmp_path):
     with TestClient(create_app(tmp_path,TOKEN)) as client:
         assert client.get('/api/v1/models').status_code==401
         result=client.get('/api/v1/models',headers=AUTH).json()
-        assert len(result['models'])==3
+        assert len(result['models'])==7
         assert all(m['status']=='not_installed' for m in result['models'])
         assert not (tmp_path/'models').exists()
         assert client.post('/api/v1/models/unknown/download',headers=AUTH).status_code==404
