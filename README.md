@@ -132,3 +132,17 @@ La pagina iniziale permette di accedere, creare e scegliere materie, caricare re
 Le operazioni con sessione browser richiedono la stessa origine dell'applicazione; gli altri client continuano a poter usare il token bearer. Le risorse dell'interfaccia sono incluse nel repository, senza CDN o font esterni. Questa prima interfaccia usa HTML/CSS/JavaScript senza build Node per rendere verificabile il flusso completo prima del contenitore desktop. La distribuzione multiutente resta da implementare.
 
 Il caricamento mostra uno stato di attesa durante upload e validazione, senza percentuali simulate. La compatibilità di riproduzione dipende anche dai codec del browser. Le funzionalità IA non vengono simulate nell'interfaccia: pulizia, trascrizione e dispense sono ancora pianificate.
+
+## Importazione assistita
+
+Nel modulo Aggiungi lezione è possibile trascinare una singola registrazione nell'area dedicata oppure selezionarla con il controllo file, utilizzabile anche da tastiera.
+
+Prima del salvataggio l'app propone:
+
+- Titolo: tag del file quando presente, altrimenti nome ripulito da prefisso della materia e data riconosciuta.
+- Docente: tag artista, se disponibile, con avviso di verifica; il tag artista non garantisce l'identità del docente.
+- Data: data completa ISO nei tag o nel nome. Date senza anno, come `10-31`, non vengono completate automaticamente.
+
+Le proposte sono modificabili e riportano la provenienza. I campi compilati manualmente non vengono sovrascritti quando arriva la risposta dei metadati. Non viene ancora analizzato il parlato: il riconoscimento semantico del titolo e del docente richiede la futura pipeline di trascrizione.
+
+L'endpoint autenticato `POST /api/v1/audio/preview` riceve un file multipart e legge i tag senza creare lezioni o originali nell'archivio. Per ora il file viene inviato al backend locale una volta per l'anteprima e nuovamente all'importazione; il riuso di un upload temporaneo è un miglioramento futuro, soprattutto per la distribuzione server. Se i metadati non sono leggibili si può compilare manualmente; la decodifica completa avviene comunque all'importazione.

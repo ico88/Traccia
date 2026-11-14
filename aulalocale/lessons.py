@@ -18,6 +18,7 @@ from mutagen.flac import FLAC
 from mutagen.mp3 import MP3
 from mutagen.mp4 import MP4
 from mutagen.wave import WAVE
+from .suggestions import audio_suggestions
 
 MAX_UPLOAD_BYTES = 512 * 1024 * 1024
 FORMATS = {".mp3": (MP3, "audio/mpeg"), ".wav": (WAVE, "audio/wav"),
@@ -100,6 +101,12 @@ def lessons_router(root, connect, authenticate):
         if row is None:
             raise HTTPException(404, "Lesson not found")
         return dict(row)
+
+    @router.post("/audio/preview")
+    def preview_audio(file: UploadFile = File(...)):
+        if file.size is not None and file.size > MAX_UPLOAD_BYTES:
+            raise HTTPException(413, "Audio exceeds the 512 MiB limit")
+        return audio_suggestions(file.file, file.filename or "", FORMATS)
 
     @router.post("/subjects/{subject_id}/lessons", status_code=201, response_model=Lesson)
     def import_lesson(subject_id: UUID, file: UploadFile = File(...),
