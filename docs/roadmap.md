@@ -1,7 +1,7 @@
 # Roadmap
 
 1. Fondazione: repository, workflow Git, API materie, database e test.
-2. Importazione: validazione audio, hash, asset originali, metadati e lezioni.
+2. Importazione: validazione audio, hash, asset originali, metadati e lezioni — implementati nel backend; interfaccia ancora da sviluppare.
 3. Audio: worker, anteprima, miglioramento, lettore originale/derivato e misure su campioni reali.
 4. Trascrizione: modelli locali qualificati, segmenti, timestamp, correzioni e glossario.
 5. Dispense: fonti, capitoli incrementali, revisioni, protezione delle modifiche, immagini e schemi.

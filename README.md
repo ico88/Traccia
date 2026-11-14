@@ -10,11 +10,12 @@ Il codice applicativo è sul branch [`sviluppo`](https://github.com/ico88/aulalo
 
 ## Stato attuale
 
-Questa prima base implementa un'API locale con archivio SQLite, creazione e consultazione delle materie, autenticazione tramite token locale e test automatici. Non implementa ancora importazione audio, trascrizione, denoising, dispense o interfaccia grafica.
+Questa prima base implementa un'API locale con archivio SQLite, creazione e consultazione delle materie, importazione e consultazione delle lezioni, lettura dei metadati audio, conservazione e riproduzione degli originali, autenticazione tramite token locale e test automatici. Non implementa ancora trascrizione, denoising, dispense o interfaccia grafica.
 
 | Funzione | Stato |
 |---|---|
 | Archivio persistente delle materie | Implementato nelle API |
+| Importazione lezioni, metadati e accesso all’audio originale | Implementato nelle API |
 | Miglioramento audio e lettore sincronizzato | Pianificato |
 | Trascrizione italiana locale e revisione | Pianificato |
 | Dispense incrementali con fonti e versioni | Pianificato |
@@ -58,7 +59,7 @@ python -m pytest
 
 ## Architettura prevista
 
-Interfaccia React/TypeScript condivisa fra contenitore desktop Electron e browser; backend FastAPI, SQLite e file locali; worker separati per le elaborazioni lunghe. La prima implementazione copre solo il backend delle materie.
+Interfaccia React/TypeScript condivisa fra contenitore desktop Electron e browser; backend FastAPI, SQLite e file locali; worker separati per le elaborazioni lunghe. La prima implementazione copre il backend delle materie e delle lezioni; il lettore grafico resta da realizzare.
 
 Candidati da qualificare: whisper.cpp per trascrivere, DeepFilterNet per ridurre il rumore, llama.cpp e un modello multilingue quantizzato per generare dispense. Le versioni, i modelli e le licenze saranno selezionati tramite benchmark, senza promettere qualità o tempi prima delle misure.
 
@@ -89,3 +90,37 @@ La licenza del codice deve ancora essere scelta dal titolare. Repository pubblic
 ## Attivazione della CI
 
 I test sono eseguibili localmente. Il modello di workflow è in `docs/ci-workflow.yml`: deve essere spostato in `.github/workflows/ci.yml` quando la credenziale GitHub dispone del permesso `workflow`. La CI GitHub non è ancora attiva. Dopo la prima esecuzione, rendere obbligatorio il controllo `backend-tests` nella protezione di `main`.
+
+## Importare una lezione
+
+Sono accettati MP3, WAV, M4A e FLAC, fino a 512 MiB per file. L'importazione legge il contenuto, verifica che corrisponda all'estensione e prova a decodificare tutta la traccia audio con FFmpeg locale. Il pacchetto `imageio-ffmpeg` fornisce il binario: non serve un'installazione separata nel percorso standard.
+
+Sostituire `SUBJECT_ID` con l'identificativo restituito dalla creazione della materia:
+
+```sh
+curl -X POST http://127.0.0.1:8765/api/v1/subjects/SUBJECT_ID/lessons \
+  -H "Authorization: Bearer $AULALOCALE_TOKEN" \
+  -F 'title=Introduzione alla materia' \
+  -F 'teacher=Docente' \
+  -F 'lecture_date=2026-10-31' \
+  -F 'file=@/percorso/lezione.mp3'
+```
+
+Titolo obbligatorio; docente e data facoltativi. Il server restituisce identificativo, hash SHA-256, dimensione, durata stimata dai metadati, frequenza di campionamento e numero di canali. Non restituisce percorsi locali. La copia archiviata mantiene esattamente i byte dell'originale e usa un nome interno generato dall'app.
+
+| Metodo | Endpoint | Risultato |
+|---|---|---|
+| POST | `/api/v1/subjects/{id}/lessons` | Importazione multipart |
+| GET | `/api/v1/subjects/{id}/lessons?limit=50&offset=0` | Lezioni della materia |
+| GET | `/api/v1/lessons/{id}` | Metadati della lezione |
+| GET | `/api/v1/lessons/{id}/audio` | Audio originale, con richieste HTTP Range |
+
+Tutti richiedono il token bearer, incluso l'audio; il futuro lettore dovrà gestire questa autenticazione. I duplicati identici nella stessa materia restituiscono HTTP 409 con il riferimento alla lezione esistente. Lo stesso audio può essere associato a materie diverse, per ora con copie distinte.
+
+La validazione è sincrona con timeout di 180 secondi: la coda persistente arriverà nella fase successiva. Gli import falliti vengono ripuliti; un arresto improvviso del processo fra filesystem e commit SQLite può lasciare file orfani, la cui riconciliazione non è ancora implementata. Il limite applicativo viene verificato dopo il parsing multipart e durante la copia: non è ancora un limite preventivo sul traffico HTTP; per questo la versione rimane esclusivamente locale.
+
+L'aggiornamento del database dalla versione 1 alla 2 conserva le materie esistenti. Non sono supportati downgrade del database.
+
+## Dipendenze audio
+
+Mutagen è utilizzato per i metadati (licenza GPL, vedere il pacchetto upstream). `imageio-ffmpeg` distribuisce un binario FFmpeg con condizioni proprie della build. Queste dipendenze richiedono una verifica di compatibilità prima della scelta della licenza del prodotto e della distribuzione di installer. Nessun codice VoiceStudio è incluso.

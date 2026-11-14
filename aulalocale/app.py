@@ -10,6 +10,7 @@ import sqlite3
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from .lessons import lessons_router, migrate_lessons
 
 
 class SubjectInput(BaseModel):
@@ -36,6 +37,7 @@ def create_app(data_dir: Path | None = None, token: str | None = None) -> FastAP
     def connect():
         connection = sqlite3.connect(database, timeout=10)
         connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON")
         return connection
 
     @asynccontextmanager
@@ -47,10 +49,10 @@ def create_app(data_dir: Path | None = None, token: str | None = None) -> FastAP
             connection.execute("""CREATE TABLE IF NOT EXISTS subjects (
                 id TEXT PRIMARY KEY, title TEXT NOT NULL,
                 description TEXT NOT NULL, created_at TEXT NOT NULL)""")
-            connection.execute("PRAGMA user_version = 1")
+            migrate_lessons(connection)
         yield
 
-    api = FastAPI(title="AulaLocale", version="0.1.0", lifespan=lifespan,
+    api = FastAPI(title="AulaLocale", version="0.2.0", lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
     bearer = HTTPBearer(auto_error=False)
 
@@ -94,6 +96,7 @@ def create_app(data_dir: Path | None = None, token: str | None = None) -> FastAP
             raise HTTPException(status_code=404, detail="Subject not found")
         return dict(record)
 
+    api.include_router(lessons_router(root, connect, authenticate))
     return api
 
 
