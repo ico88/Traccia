@@ -103,6 +103,8 @@ Le dispense sono proposte basate sulle revisioni delle trascrizioni, con riferim
 
 Immagini fino a 20 MiB e 20 megapixel vengono validate e ricodificate in PNG. Per ora sono materiali della materia, non figure collocate automaticamente in punti specifici dei capitoli. È possibile generare localmente una mappa dei capitoli dalla dispensa accettata: è un indice visivo dei primi 12 capitoli, non una mappa di relazioni causali. Il PDF usa la funzione di stampa del browser, non un generatore PDF lato server.
 
+Il confronto sperimentale con **Fluid Speech Pro MLX**, separato dall’app, è documentato in [docs/fluid-experiment.md](docs/fluid-experiment.md). È stato eseguito su M4; non è ancora una scelta disponibile nel pacchetto Mac.
+
 ## Backup
 
 **Esporta backup** crea uno ZIP con uno snapshot SQLite, audio originali, versioni completate e immagini, con manifest SHA-256. Non include modelli, runtime o credenziali. Il ripristino non sovrascrive archivi esistenti:

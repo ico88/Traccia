@@ -1,6 +1,6 @@
-# Prossima verifica: modello e trattamento audio
+# Verifica: modello e trattamento audio
 
-Il riconoscimento corrente usa Whisper Large v3 Turbo Q8 sull'originale con normalizzazione del volume. La versione migliorata per l'ascolto non viene ancora usata come sorgente ASR.
+Il riconoscimento corrente usa Whisper Large v3 Turbo Q8, con normalizzazione del volume. Dalla versione 0.6 è possibile scegliere originale o versione migliorata; per GTCRN viene usato il WAV prima della ricompressione MP3. La scelta non è automatica: occorre qualificare il trattamento.
 
 Confrontare prima Turbo e Large v3 completo, mantenendo identiche lingua, impostazioni, segmentazione e precisione numerica comparabile. Per ogni modello usare gli stessi estratti in tre condizioni: originale, normalizzazione conservativa, normalizzazione con riduzione rumore leggera. Separare la variazione del modello da quella dei filtri.
 
@@ -15,3 +15,5 @@ Riferimenti upstream:
 - https://huggingface.co/openai/whisper-large-v3
 - https://huggingface.co/Qwen/Qwen3-ASR-1.7B
 - https://github.com/Rikorose/DeepFilterNet
+
+Prima prova controllata Fluid/Whisper su tre estratti: [metodo e risultati](fluid-experiment.md). Nessun riferimento umano disponibile, quindi accuratezza non misurata.

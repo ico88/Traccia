@@ -1,0 +1,5 @@
+# Optional isolated research environment, not a production/package dependency.
+parakeet-mlx==0.7.0
+mlx==0.32.4
+mlx-metal==0.32.4
+numpy==2.4.6
