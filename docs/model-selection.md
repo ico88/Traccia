@@ -12,7 +12,7 @@ La categoria [Audio-Text-to-Text](https://huggingface.co/models?pipeline_tag=aud
 | [MOSS-Transcribe-Diarize 0.9B](https://huggingface.co/OpenMOSS-Team/MOSS-Transcribe-Diarize) | ASR, timestamp e parlanti, 50+ lingue, audio fino a 90 minuti dichiarati, Apache 2.0; codice Transformers personalizzato | [Prova M4 eseguita](moss-experiment.md): ripetizione nel primo originale anche su CPU; 3/3 estratti puliti terminano regolarmente, accuratezza non qualificata. Non integrato |
 | [VibeVoice-ASR](https://huggingface.co/microsoft/VibeVoice-ASR) | ASR con timestamp e parlanti, 50+ lingue, audio fino a 60 minuti dichiarati, MIT | Alternativa da valutare dopo i modelli più compatti; memoria su audio lungo non deducibile dai soli pesi |
 | [Voxtral Mini 3B](https://huggingface.co/mistralai/Voxtral-Mini-3B-2507) | Trascrizione, comprensione e riassunto, italiano incluso, Apache 2.0 | Interessante in seguito per domande sull'audio; la documentazione di riferimento usa vLLM/Transformers, integrazione Mac ancora da provare |
-| [Qwen3-ASR 1.7B](https://huggingface.co/Qwen/Qwen3-ASR-1.7B) | ASR con italiano, Apache 2.0 | Altro candidato per il confronto controllato, distinto dal Qwen3 4B usato per le dispense |
+| [Qwen3-ASR 1.7B](https://huggingface.co/Qwen/Qwen3-ASR-1.7B) | ASR con italiano, Apache 2.0 | [Prova MLX 8 bit completata su M4](qwen-large-experiment.md): 9 casi terminati senza limite token; accuratezza non qualificata. Distinto dal Qwen3 4B delle dispense |
 
 Le schede Fluid dichiarano risultati favorevoli anche in italiano e disponibilità di runtime specifici per i nostri hardware. Sono dichiarazioni dell'autore e benchmark su altri corpora: non dimostrano una superiorità sulla registrazione di Farmacologia. Le velocità su GPU NVIDIA non vanno applicate a M4 o i7. La modalità «clean» modifica il testo eliminando ripetizioni e intercalari: per il confronto della trascrizione fedele va disattivata.
 
@@ -23,3 +23,5 @@ Le schede Fluid dichiarano risultati favorevoli anche in italiano e disponibilit
 3. Valutare diarizzazione e ASR con parlanti come funzione separata. Etichette «Parlante 1/2» non identificano automaticamente il docente: l'utente deve poter correggere il ruolo.
 
 Nessun nuovo modello di questa tabella è stato scaricato, eseguito o aggiunto all'app durante questa ricerca. I dati restano locali. Fonte della scheda Fluid letta dal README pubblico grezzo dello stesso repository; nessun codice personalizzato del modello è stato eseguito.
+
+Anche [Whisper Large v3 completo FP16 è stato provato](qwen-large-experiment.md) sugli stessi nove WAV. Non sostituisce automaticamente il Turbo dell’app.

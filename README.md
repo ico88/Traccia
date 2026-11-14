@@ -107,6 +107,8 @@ Il confronto sperimentale con **Fluid Speech Pro MLX**, separato dall’app, è 
 
 È disponibile anche una [prova separata di MOSS-Transcribe-Diarize](docs/moss-experiment.md), con timestamp e parlanti: non è incluso nel pacchetto Mac.
 
+Provati separatamente anche [Qwen3-ASR 1.7B MLX e Whisper Large v3 completo](docs/qwen-large-experiment.md): entrambi eseguiti sul M4, ancora non inclusi nel selettore dell’app o nel DMG.
+
 ## Backup
 
 **Esporta backup** crea uno ZIP con uno snapshot SQLite, audio originali, versioni completate e immagini, con manifest SHA-256. Non include modelli, runtime o credenziali. Il ripristino non sovrascrive archivi esistenti:

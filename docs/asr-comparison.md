@@ -17,3 +17,5 @@ Riferimenti upstream:
 - https://github.com/Rikorose/DeepFilterNet
 
 Prima prova controllata Fluid/Whisper su tre estratti: [metodo e risultati](fluid-experiment.md). Nessun riferimento umano disponibile, quindi accuratezza non misurata.
+
+Prova successiva completata con [Qwen3-ASR 1.7B MLX e Whisper Large v3 completo](qwen-large-experiment.md), nove WAV per ciascun modello. WER/CER ancora non misurati; testo, limiti e prestazioni documentati separatamente.
