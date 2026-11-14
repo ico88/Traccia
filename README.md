@@ -10,12 +10,12 @@ Il codice applicativo è sul branch [`sviluppo`](https://github.com/ico88/aulalo
 
 ## Stato attuale
 
-Questa prima base implementa un'API locale con archivio SQLite, creazione e consultazione delle materie, importazione e consultazione delle lezioni, lettura dei metadati audio, conservazione e riproduzione degli originali, autenticazione tramite token locale e test automatici. Non implementa ancora trascrizione, denoising, dispense o interfaccia grafica.
+Questa prima base implementa un'API locale con archivio SQLite, creazione e consultazione delle materie, importazione e consultazione delle lezioni, lettura dei metadati audio, conservazione e riproduzione degli originali, autenticazione tramite token locale e test automatici. Include una prima interfaccia browser locale. Non implementa ancora trascrizione, denoising o dispense.
 
 | Funzione | Stato |
 |---|---|
-| Archivio persistente delle materie | Implementato nelle API |
-| Importazione lezioni, metadati e accesso all’audio originale | Implementato nelle API |
+| Archivio persistente delle materie | API e interfaccia locale |
+| Importazione lezioni, metadati e ascolto dell’audio originale | API e interfaccia locale |
 | Miglioramento audio e lettore sincronizzato | Pianificato |
 | Trascrizione italiana locale e revisione | Pianificato |
 | Dispense incrementali con fonti e versioni | Pianificato |
@@ -51,7 +51,7 @@ curl -H "Authorization: Bearer $AULALOCALE_TOKEN" http://127.0.0.1:8765/api/v1/s
 curl -X POST http://127.0.0.1:8765/api/v1/subjects   -H "Authorization: Bearer $AULALOCALE_TOKEN"   -H 'Content-Type: application/json'   -d '{"title":"Farmacologia","description":"Corso universitario"}'
 ```
 
-Il token deve essere esportato anche nel secondo terminale. `GET /health` è pubblico e riporta soltanto lo stato del servizio. La documentazione interattiva è disattivata nella base corrente. Non esporre questa versione su Internet: il sistema multiutente e l'installazione server non sono ancora implementati.
+Il token deve essere esportato anche nel secondo terminale. `GET /health` è pubblico e riporta soltanto lo stato del servizio. Aprire `http://127.0.0.1:8765/` nel browser e inserire il token configurato per usare l’interfaccia. Il token non viene salvato in localStorage: l’accesso crea un cookie di sessione HttpOnly, SameSite Strict, valido nel browser fino a 8 ore. Il pulsante Esci elimina il cookie dal browser; cambiare il token del server invalida tutte le sessioni precedenti. La documentazione interattiva API è disattivata. Non esporre questa versione su Internet: il sistema multiutente e l'installazione server non sono ancora implementati.
 
 ```sh
 python -m pytest
@@ -59,7 +59,7 @@ python -m pytest
 
 ## Architettura prevista
 
-Interfaccia React/TypeScript condivisa fra contenitore desktop Electron e browser; backend FastAPI, SQLite e file locali; worker separati per le elaborazioni lunghe. La prima implementazione copre il backend delle materie e delle lezioni; il lettore grafico resta da realizzare.
+Interfaccia React/TypeScript condivisa fra contenitore desktop Electron e browser; backend FastAPI, SQLite e file locali; worker separati per le elaborazioni lunghe. La prima implementazione copre il backend delle materie e delle lezioni; una prima interfaccia leggera è servita direttamente da FastAPI; React/Electron rimangono lo stack previsto per l’app desktop.
 
 Candidati da qualificare: whisper.cpp per trascrivere, DeepFilterNet per ridurre il rumore, llama.cpp e un modello multilingue quantizzato per generare dispense. Le versioni, i modelli e le licenze saranno selezionati tramite benchmark, senza promettere qualità o tempi prima delle misure.
 
@@ -124,3 +124,11 @@ L'aggiornamento del database dalla versione 1 alla 2 conserva le materie esisten
 ## Dipendenze audio
 
 Mutagen è utilizzato per i metadati (licenza GPL, vedere il pacchetto upstream). `imageio-ffmpeg` distribuisce un binario FFmpeg con condizioni proprie della build. Queste dipendenze richiedono una verifica di compatibilità prima della scelta della licenza del prodotto e della distribuzione di installer. Nessun codice VoiceStudio è incluso.
+
+## Interfaccia locale (anteprima 0.3)
+
+La pagina iniziale permette di accedere, creare e scegliere materie, caricare registrazioni con titolo, docente e data, consultare i metadati e ascoltare l'originale. Il lettore offre i controlli nativi del browser e velocità da 0,75× a 2×. Le materie e le lezioni vengono caricate mediante paginazione; testo inserito dagli utenti viene reso come testo semplice.
+
+Le operazioni con sessione browser richiedono la stessa origine dell'applicazione; gli altri client continuano a poter usare il token bearer. Le risorse dell'interfaccia sono incluse nel repository, senza CDN o font esterni. Questa prima interfaccia usa HTML/CSS/JavaScript senza build Node per rendere verificabile il flusso completo prima del contenitore desktop. La distribuzione multiutente resta da implementare.
+
+Il caricamento mostra uno stato di attesa durante upload e validazione, senza percentuali simulate. La compatibilità di riproduzione dipende anche dai codec del browser. Le funzionalità IA non vengono simulate nell'interfaccia: pulizia, trascrizione e dispense sono ancora pianificate.

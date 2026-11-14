@@ -7,7 +7,9 @@ import hmac
 import os
 import sqlite3
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from .lessons import lessons_router, migrate_lessons
@@ -52,16 +54,55 @@ def create_app(data_dir: Path | None = None, token: str | None = None) -> FastAP
             migrate_lessons(connection)
         yield
 
-    api = FastAPI(title="AulaLocale", version="0.2.0", lifespan=lifespan,
+    api = FastAPI(title="AulaLocale", version="0.3.0", lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
     bearer = HTTPBearer(auto_error=False)
 
-    def authenticate(credentials: HTTPAuthorizationCredentials | None = Depends(bearer)):
-        if credentials is None or not hmac.compare_digest(
-            credentials.credentials.encode(), secret.encode()
-        ):
-            raise HTTPException(status_code=401, detail="Unauthorized",
-                                headers={"WWW-Authenticate": "Bearer"})
+    session_cookie = "aulalocale_session"
+    session_value = hmac.new(secret.encode(), b"browser-session-v1", "sha256").hexdigest()
+
+    def unauthorized():
+        raise HTTPException(status_code=401, detail="Unauthorized",
+                            headers={"WWW-Authenticate": "Bearer"})
+
+    def authenticate(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(bearer)):
+        if credentials is not None:
+            if not hmac.compare_digest(credentials.credentials.encode(), secret.encode()):
+                unauthorized()
+            return
+        cookie = request.cookies.get(session_cookie, "")
+        if not cookie or not hmac.compare_digest(cookie.encode(), session_value.encode()):
+            unauthorized()
+        expected_origin = str(request.base_url).rstrip("/")
+        origin = request.headers.get("origin")
+        if (origin and origin != expected_origin) or request.headers.get("sec-fetch-site") in {"cross-site", "same-site"}:
+            raise HTTPException(403, "Cross-origin session request refused")
+        if request.method not in {"GET", "HEAD", "OPTIONS"} and origin != expected_origin:
+            raise HTTPException(403, "Same-origin request required")
+
+    @api.post("/api/v1/session", status_code=204)
+    def login(request: Request, response: Response,
+              credentials: HTTPAuthorizationCredentials | None = Depends(bearer)):
+        if credentials is None or not hmac.compare_digest(credentials.credentials.encode(), secret.encode()):
+            unauthorized()
+        response.set_cookie(session_cookie, session_value, httponly=True, samesite="strict",
+                            secure=request.url.scheme == "https", path="/api/v1", max_age=28800)
+        response.headers["Cache-Control"] = "no-store"
+
+    @api.delete("/api/v1/session", status_code=204, dependencies=[Depends(authenticate)])
+    def logout(response: Response):
+        response.delete_cookie(session_cookie, path="/api/v1", httponly=True, samesite="strict")
+        response.headers["Cache-Control"] = "no-store"
+
+    web = Path(__file__).parent / "web"
+    api.mount("/static", StaticFiles(directory=web), name="static")
+
+    @api.get("/", include_in_schema=False)
+    def interface():
+        return FileResponse(web / "index.html", headers={
+            "Cache-Control": "no-store",
+            "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; media-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+            "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"})
 
     @api.get("/health")
     def health():
