@@ -1,10 +1,14 @@
-# AulaLocale
+# Traccia
 
-**Le lezioni, al loro posto.** Archivio, audio migliorato, trascrizioni e dispense per materia, con elaborazione sul proprio computer.
+**Ogni lezione lascia il segno.** Archivio, audio migliorato, trascrizioni e dispense per materia, con elaborazione sul proprio computer.
 
-AulaLocale è un software sperimentale per studenti universitari. I file restano sul Mac o sul server su cui viene installato. I modelli si scaricano gratuitamente da Hugging Face o dalle release ufficiali dei progetti e vengono eseguiti localmente: **nessuna API di inferenza cloud, nessun token Hugging Face nel percorso standard**.
+Traccia è un software sperimentale per studenti universitari. I file restano sul Mac o sul server su cui viene installato. I modelli si scaricano gratuitamente da Hugging Face o dalle release ufficiali dei progetti e vengono eseguiti localmente: **nessuna API di inferenza cloud, nessun token Hugging Face nel percorso standard**.
 
-Il nome è provvisorio. L'applicazione è in sviluppo e la qualità dei modelli va ancora qualificata su registrazioni universitarie rappresentative.
+Nome e identità visiva scelti per il progetto; disponibilità di marchio e domini ancora da verificare. L'applicazione è in sviluppo e la qualità dei modelli va ancora qualificata su registrazioni universitarie rappresentative.
+
+![Traccia](branding/traccia-wordmark.svg)
+
+Il progetto si chiamava AulaLocale. Per compatibilità conserva per ora il repository `ico88/aulalocale`, il modulo Python `aulalocale`, le variabili `AULALOCALE_*`, l’identificatore del bundle e i percorsi dell’archivio esistente. Non è necessario spostare o reimportare le lezioni.
 
 ## Cosa offre questa versione
 
@@ -172,4 +176,4 @@ Leggere [CONTRIBUTING.md](CONTRIBUTING.md), [architettura](docs/architecture.md)
 
 La licenza del codice del progetto deve ancora essere scelta dal titolare: repository pubblico non equivale a licenza open source. Le dipendenze mantengono le proprie condizioni; in particolare Mutagen è GPL, e FFmpeg richiede la verifica della build effettivamente distribuita. La compatibilità delle licenze va chiusa prima di distribuire una release del prodotto.
 
-[VoiceStudio](https://github.com/debpalash/voicestudio) è un riferimento per l'esperienza di installazione e gestione modelli. Non è stato copiato il suo codice e AulaLocale non è affiliato al progetto.
+[VoiceStudio](https://github.com/debpalash/voicestudio) è un riferimento per l'esperienza di installazione e gestione modelli. Non è stato copiato il suo codice e Traccia non è affiliato al progetto.

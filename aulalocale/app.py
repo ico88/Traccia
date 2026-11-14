@@ -76,7 +76,7 @@ def create_app(data_dir: Path | None = None, token: str | None = None, bootstrap
             worker.stop()
             models.close()
 
-    api = FastAPI(title="AulaLocale", version="0.9.0", lifespan=lifespan,
+    api = FastAPI(title="Traccia", version="0.9.1", lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
     bearer = HTTPBearer(auto_error=False)
 

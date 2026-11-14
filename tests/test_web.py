@@ -10,7 +10,7 @@ def test_interface_is_self_contained(tmp_path):
     with TestClient(create_app(tmp_path, TOKEN)) as client:
         response = client.get('/')
         assert response.status_code == 200
-        assert 'AulaLocale' in response.text
+        assert 'Traccia' in response.text
         assert "frame-ancestors 'none'" in response.headers['content-security-policy']
         for asset in ['app.js', 'style.css']:
             assert client.get('/static/'+asset).status_code == 200

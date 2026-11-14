@@ -21,7 +21,7 @@ def main():
         else:from aulalocale.ai_speakers import main as run_worker
         run_worker(sys.argv[sys.argv.index(internal)+1:])
         return
-    parser=argparse.ArgumentParser(description='AulaLocale local desktop launcher')
+    parser=argparse.ArgumentParser(description='Traccia local desktop launcher')
     parser.add_argument('--data',type=Path)
     parser.add_argument('--no-browser',action='store_true',help='Headless local service')
     parser.add_argument('--browser',action='store_true',help='Open the external browser instead of the Mac app window')
@@ -48,7 +48,7 @@ def main():
             deadline=time.monotonic()+30
             while not server.started and service.is_alive() and time.monotonic()<deadline:time.sleep(.05)
             if not server.started:raise RuntimeError('Il servizio locale non si è avviato. Controlla il log dell’app.')
-            window=webview.create_window('AulaLocale',f'http://127.0.0.1:{port}/#access={nonce}',width=1280,height=860,min_size=(880,620),background_color='#f8f9f6')
+            window=webview.create_window('Traccia',f'http://127.0.0.1:{port}/#access={nonce}',width=1280,height=860,min_size=(880,620),background_color='#f8f9f6')
             window.events.closed += lambda: setattr(server,'should_exit',True)
             webview.settings['ALLOW_DOWNLOADS']=True
             webview.start(private_mode=True,debug=False)
@@ -63,7 +63,7 @@ def main():
             if server.started:webbrowser.open(f'http://127.0.0.1:{port}/#access={nonce}')
         Thread(target=open_window,daemon=True).start()
     else:
-        print(f'AulaLocale: http://127.0.0.1:{port}/',flush=True)
+        print(f'Traccia: http://127.0.0.1:{port}/',flush=True)
         print('Access token: '+token,flush=True)
     try:server.run(sockets=[listener])
     finally:listener.close()
