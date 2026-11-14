@@ -28,9 +28,15 @@ def main():
     command.append(str(ROOT/'scripts'/'desktop_entry.py'))
     subprocess.run(command,check=True)
     bundle=output/'AulaLocale.app'
-    for attribute in ['com.apple.FinderInfo','com.apple.ResourceFork']:
-        subprocess.run(['xattr','-dr',attribute,str(bundle)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
-    subprocess.run(['codesign','--force','--deep','--sign','-',str(bundle)],check=True)
+    # Finder/iCloud may reattach these two packaging attributes while signing.
+    # Retry only that specific error; never clear quarantine or bypass verification.
+    for attempt in range(3):
+        for attribute in ['com.apple.FinderInfo','com.apple.ResourceFork']:
+            subprocess.run(['xattr','-dr',attribute,str(bundle)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
+        signed=subprocess.run(['codesign','--force','--deep','--sign','-',str(bundle)],capture_output=True,text=True)
+        if signed.returncode==0:break
+        if 'resource fork, Finder information' not in signed.stderr or attempt==2:
+            raise RuntimeError(signed.stderr)
     for attribute in ['com.apple.FinderInfo','com.apple.ResourceFork']:
         subprocess.run(['xattr','-dr',attribute,str(bundle)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
     subprocess.run(['codesign','--verify','--deep','--strict',str(bundle)],check=True)
@@ -39,8 +45,8 @@ def main():
             stage=Path(temporary)
             shutil.copytree(bundle,stage/'AulaLocale.app',symlinks=True)
             (stage/'Applicazioni').symlink_to('/Applications')
-            (stage/'LEGGIMI.txt').write_text('AulaLocale 0.7 - build di sviluppo Apple Silicon.\nTrascina AulaLocale in Applicazioni e avviala. I modelli si scaricano dalla schermata Modelli locali.\nBuild ad hoc non notarizzata, destinata ai test locali. Nessuna registrazione inclusa.\nSorgenti: https://github.com/ico88/aulalocale/tree/sviluppo\n')
-            subprocess.run(['hdiutil','create','-ov','-volname','AulaLocale','-srcfolder',str(stage),'-format','UDZO',str(output/'AulaLocale-0.7-AppleSilicon-sviluppo.dmg')],check=True)
+            (stage/'LEGGIMI.txt').write_text('AulaLocale 0.8 - build di sviluppo Apple Silicon.\nTrascina AulaLocale in Applicazioni e avviala. I modelli si scaricano dalla schermata Modelli locali.\nBuild ad hoc non notarizzata, destinata ai test locali. Nessuna registrazione inclusa.\nSorgenti: https://github.com/ico88/aulalocale/tree/sviluppo\n')
+            subprocess.run(['hdiutil','create','-ov','-volname','AulaLocale','-srcfolder',str(stage),'-format','UDZO',str(output/'AulaLocale-0.8-AppleSilicon-sviluppo.dmg')],check=True)
     if (output/'AulaLocale').is_dir():shutil.rmtree(output/'AulaLocale')
     print('Development .app built. Distribution signing and notarization are not included.')
 

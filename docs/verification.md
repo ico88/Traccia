@@ -60,3 +60,13 @@ Prova browser su archivio dimostrativo separato con segnale audio sintetico: con
 Pacchetto Mac 0.7 eseguito nell’archivio di prova separato: avvio, runtime inclusi, GTCRN reale, Whisper dal WAV neurale, proposta Qwen e arresto regolare. Build ad hoc non notarizzata; nessun peso o archivio personale incluso, nessuna prova su un secondo Mac.
 
 Verificata anche la ripetizione del passaggio nel browser. L’anteprima sull’archivio reale è stata riavviata con il backend 0.7; una richiesta di controllo su ID inesistenti conferma la nuova validazione senza coinvolgere proposte reali.
+
+## Versione 0.8 — dispense dinamiche
+
+Prima integrazione incrementale per argomenti, controllo delle revisioni già considerate, ricostruzione delle parti automatiche collegate a fonti corrette, conservazione delle sezioni manuali, confronto prima/dopo e conferma esplicita delle sostituzioni.
+
+Prove con Qwen locale su due lezioni sintetiche: fusione nel capitolo esistente con entrambe le fonti e nota manuale invariata; terza lezione discordante mantenuta separata e segnalata. Verifica browser di confronto, accettazione e segnalazione del contrasto. Dettagli in [dynamic-notes.md](dynamic-notes.md). Nessuna dispensa o trascrizione reale sostituita durante le prove.
+
+75 test automatici superati: pianificazione incrementale, fonti collegate ricostruite dopo una correzione, consolidamento con fonti di entrambe le lezioni, rifiuto della perdita di riferimenti, conservazione delle parti manuali, blocco dell’accettazione senza controllo delle sostituzioni e segnalazioni di contrasto negli export. È coperto anche il caso di metadati precedenti su un capitolo manuale, che non deve riavviare inutilmente la generazione.
+
+Pacchetto Mac 0.8 verificato: avvio del server incluso, risorse web, GTCRN, Whisper, proposta Qwen con la nuova pianificazione e arresto regolare nell’archivio di prova separato. Firma ad hoc verificata, non notarizzata. Nessuna prova su un secondo Mac o server i7.

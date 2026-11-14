@@ -1,4 +1,4 @@
-# Architettura 0.6
+# Architettura 0.8
 
 ## Applicazione
 
@@ -18,7 +18,7 @@ Un thread orchestratore, con lock esclusivo per archivio, avvia un solo processo
 
 Whisper riceve WAV mono 16 kHz normalizzati, in blocchi di dieci minuti. Risultati con segmenti temporali e revisione del modello. Il profilo corrente usa Large v3 Turbo Q8. Le revisioni manuali restano protette; la ritrascrizione di una versione automatica richiede l'identificativo esatto della revisione corrente e non elimina quella precedente.
 
-Qwen3 4B Q4_K_M tramite llama.cpp offline genera JSON vincolato a schema. Gli id delle citazioni devono appartenere agli input; il controllo è strutturale e non dimostra il sostegno semantico di ogni affermazione. Una proposta non sostituisce automaticamente la dispensa. I capitoli manuali vengono preservati; la classificazione tematica e la deduplicazione richiedono ulteriore lavoro.
+Qwen3 4B Q4_K_M tramite llama.cpp offline genera JSON vincolato a schema. Gli id delle citazioni devono appartenere agli input; il controllo è strutturale e non dimostra il sostegno semantico di ogni affermazione. Una proposta non sostituisce automaticamente la dispensa. I capitoli manuali vengono preservati; una prima classificazione/consolidamento tematico è implementata in `note_consolidation.py` e rimane da qualificare; vedere [dispense dinamiche](dynamic-notes.md).
 
 Download dei pesi separato dall'inferenza: un download alla volta, revisioni immutabili, dimensione e SHA-256 verificati. Nessun upload di contenuti di studio o inferenza remota. I runtime sono compilati separatamente da sorgenti upstream verificati; nel pacchetto Mac vengono inclusi, insieme a Python e FFmpeg.
 

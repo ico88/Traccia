@@ -35,7 +35,7 @@ def test_review_rejects_unknown_or_duplicate_ids_without_new_revision(tmp_path):
 
 def test_notes_require_explicit_review_of_every_new_chapter(tmp_path,monkeypatch):
     sid,lid,rid,segment=seeded(tmp_path);enable_fake_llm(monkeypatch,tmp_path)
-    monkeypatch.setattr(StudyEngine,'llm',lambda *args,**kwargs:{'chapters':[{'title':'Prima sezione','text':'Prima sintesi.','citations':[1]},{'title':'Seconda sezione','text':'Seconda sintesi.','citations':[1]}]})
+    monkeypatch.setattr(StudyEngine,'llm',lambda *args,**kwargs:({'target':0} if kwargs.get('mode')=='route' else {'chapters':[{'title':'Prima sezione','text':'Prima sintesi.','citations':[1]},{'title':'Seconda sezione','text':'Seconda sintesi.','citations':[1]}]}))
     with TestClient(create_app(tmp_path,TOKEN)) as client:
         route=f'/api/v1/subjects/{sid}/notes'
         job=client.post(route+'/generate',headers=AUTH).json();assert wait(client,job['id'])['status']=='completed'

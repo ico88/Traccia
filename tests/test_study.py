@@ -62,7 +62,7 @@ def test_transcript_revisions_and_conflicts(tmp_path):
 def enable_fake_llm(monkeypatch,tmp_path,invalid=False):
     monkeypatch.setattr(ModelManager,'require',lambda self,key:tmp_path/'model')
     monkeypatch.setattr(study,'runtime_path',lambda name:sys.executable)
-    monkeypatch.setattr(StudyEngine,'llm',lambda self,prompt,temp,identifier,citation_count=None:{'chapters':[{'title':'Recettori','text':'Sintesi basata sulla lezione.','citations':[900 if invalid else 1]}]})
+    monkeypatch.setattr(StudyEngine,'llm',lambda self,prompt,temp,identifier,citation_count=None,mode=None:({'target':0} if mode=='route' else {'chapters':[{'title':'Recettori','text':'Sintesi basata sulla lezione.','citations':[900 if invalid else 1]}]}))
 
 
 def test_notes_proposal_accept_edit_incremental_and_export(tmp_path,monkeypatch):
@@ -76,18 +76,20 @@ def test_notes_proposal_accept_edit_incremental_and_export(tmp_path,monkeypatch)
         assert data['current'] is None
         proposal=data['proposals'][0]
         assert proposal['chapters'][0]['sources'][0]['segment_id']==segment['id']
-        accepted=client.post(route+'/'+proposal['id']+'/accept',headers=AUTH,json={'reviewed_chapter_ids':[c['id'] for c in proposal['chapters'] if not c.get('manual')]})
+        accepted=client.post(route+'/'+proposal['id']+'/accept',headers=AUTH,json={'reviewed_chapter_ids':[c['id'] for c in proposal['chapters'] if not c.get('manual')],'reviewed_removed_chapter_ids':[c['chapter_id'] for c in proposal.get('changes',{}).get('removed',[])]})
         assert accepted.status_code==200
         chapter=proposal['chapters'][0]
         edited=client.put(route,headers=AUTH,json={'base_revision':proposal['id'],'chapter_id':chapter['id'],'title':'Il mio titolo','text':'La mia correzione'})
         assert edited.status_code==200,edited.text
         assert edited.json()['chapters'][0]['manual']
         assert client.put(route,headers=AUTH,json={'base_revision':proposal['id'],'chapter_id':chapter['id'],'title':'Stale','text':'Not saved'}).status_code==409
+        assert client.post(route+'/generate',headers=AUTH).status_code==409
+        client.put(f'/api/v1/lessons/{lid}/transcript',headers=AUTH,json={'base_revision':rid,'segments':[{'id':segment['id'],'text':'Fonte aggiornata per la nuova lezione'}]})
         job=client.post(route+'/generate',headers=AUTH).json()
         assert wait(client,job['id'])['status']=='completed'
         proposal=client.get(route,headers=AUTH).json()['proposals'][0]
         assert any(c['text']=='La mia correzione' for c in proposal['chapters'])
-        assert client.post(route+'/'+proposal['id']+'/accept',headers=AUTH,json={'reviewed_chapter_ids':[c['id'] for c in proposal['chapters'] if not c.get('manual')]}).status_code==200
+        assert client.post(route+'/'+proposal['id']+'/accept',headers=AUTH,json={'reviewed_chapter_ids':[c['id'] for c in proposal['chapters'] if not c.get('manual')],'reviewed_removed_chapter_ids':[c['chapter_id'] for c in proposal.get('changes',{}).get('removed',[])]}).status_code==200
         exported=client.get(route+'/export',headers=AUTH)
         assert 'La mia correzione' in exported.text
         assert segment['id'] in exported.text
@@ -102,7 +104,7 @@ def test_stale_sources_block_acceptance(tmp_path,monkeypatch):
         proposal=client.get(route,headers=AUTH).json()['proposals'][0]
         client.put(f'/api/v1/lessons/{lid}/transcript',headers=AUTH,json={'base_revision':rid,'segments':[{'id':segment['id'],'text':'Fonte aggiornata'}]})
         assert client.get(route,headers=AUTH).json()['proposals'][0]['blocking_stale']
-        assert client.post(route+'/'+proposal['id']+'/accept',headers=AUTH,json={'reviewed_chapter_ids':[c['id'] for c in proposal['chapters'] if not c.get('manual')]}).status_code==409
+        assert client.post(route+'/'+proposal['id']+'/accept',headers=AUTH,json={'reviewed_chapter_ids':[c['id'] for c in proposal['chapters'] if not c.get('manual')],'reviewed_removed_chapter_ids':[c['chapter_id'] for c in proposal.get('changes',{}).get('removed',[])]}).status_code==409
 
 
 def test_invalid_model_citations_not_saved(tmp_path,monkeypatch):

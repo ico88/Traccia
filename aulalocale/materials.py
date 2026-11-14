@@ -65,6 +65,7 @@ def materials_router(root,connect,authenticate,worker):
     @router.post('/subjects/{subject_id}/materials/outline',status_code=201)
     def outline(subject_id:UUID,options:OutlineInput):
         from .study import latest_notes
+        from .note_consolidation import conflict_label
         with closing(connect()) as c:
             subject(c,subject_id)
             notes=latest_notes(c,subject_id)
@@ -114,6 +115,7 @@ def materials_router(root,connect,authenticate,worker):
     @router.get('/subjects/{subject_id}/study-export')
     def study_export(subject_id:UUID):
         from .study import latest_notes
+        from .note_consolidation import conflict_label
         with closing(connect()) as c:
             subject(c,subject_id)
             name=c.execute('SELECT title FROM subjects WHERE id=?',(str(subject_id),)).fetchone()[0]
@@ -126,6 +128,8 @@ def materials_router(root,connect,authenticate,worker):
             lines=['# '+name,'','Dispensa da verificare sulle fonti.','']
             for chapter in notes['chapters']:
                 lines+=['## '+chapter['title'],'',chapter['text'],'']
+                warning=conflict_label(chapter,notes['chapters'])
+                if warning:lines+=['**'+warning+'**','']
                 lines += [f"- Fonte: lezione {r['lesson_id']}, revisione {r['revision_id']}, segmento {r['segment_id']}, tempo {r['start']} s" for r in chapter['sources']]
                 lines.append('')
             with zipfile.ZipFile(path,'w',compression=zipfile.ZIP_DEFLATED) as bundle:
