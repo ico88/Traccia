@@ -3,6 +3,7 @@ const $ = (id) => document.getElementById(id);
 let subjects = [], selected = null, lessons = [], loadingVersion = 0, noticeTimer;
 let selectedAudio = null, previewController = null, previewVersion = 0, importing = false;
 let autoFields = {};
+let currentLesson = null, currentAudioJob = null, audioPollTimer = null, audioSourceVersion = 0;
 function notify(message, error = false) {
   $('notice').textContent = message;
   $('notice').classList.toggle('error', error);
@@ -11,6 +12,7 @@ function notify(message, error = false) {
   noticeTimer = setTimeout(() => { $('notice').hidden = true; }, error ? 10000 : 5000);
 }
 function signedOut() {
+  resetAudioState();
   $('player').pause(); $('player').removeAttribute('src'); $('player').load();
   $('player-panel').hidden = true;
   $('workspace').hidden = true; $('login-view').hidden = false;
@@ -25,7 +27,7 @@ async function request(path, options = {}) {
   if (response.status === 401) { signedOut(); throw new Error('Accesso richiesto. Inserisci il token locale.'); }
   if (!response.ok) {
     let detail; try { detail = (await response.json()).detail; } catch { /* generic below */ }
-    if (response.status === 409) throw new Error('Questa registrazione è già presente nella materia.');
+    if (response.status === 409) throw new Error(typeof detail === 'string' ? detail : 'Questa registrazione è già presente nella materia.');
     if (response.status === 413) throw new Error('Il file supera il limite di 512 MiB.');
     if (response.status === 422) throw new Error('Controlla i campi e il formato audio. Il file deve essere decodificabile e corrispondere all’estensione.');
     if (response.status === 507) throw new Error('Impossibile salvare: controlla spazio libero e permessi.');
@@ -63,13 +65,7 @@ function renderLessons() {
     const card = document.createElement('article'); card.className = 'lesson-card';
     const play = document.createElement('button'); play.className = 'play-button'; play.textContent = '▶';
     play.setAttribute('aria-label', `Ascolta ${lesson.title}`);
-    play.onclick = async () => {
-      $('playing-title').textContent = lesson.title;
-      $('player-panel').hidden = false;
-      $('player').src = `/api/v1/lessons/${encodeURIComponent(lesson.id)}/audio`;
-      $('player').playbackRate = Number($('speed').value);
-      try { await $('player').play(); } catch { notify('Riproduzione non avviata. Premi Play nel lettore o verifica il formato supportato dal browser.', true); }
-    };
+    play.onclick = () => openLesson(lesson);
     const details = document.createElement('div'); details.className = 'lesson-details';
     const title = document.createElement('h3'); title.textContent = lesson.title;
     const meta = document.createElement('p');
@@ -82,6 +78,7 @@ function renderLessons() {
 }
 async function selectSubject(id) {
   const version = ++loadingVersion;
+  resetAudioState();
   selected = id; renderSubjects();
   const subject = subjects.find(s => s.id === id);
   $('subject-title').textContent = subject.title;
@@ -207,6 +204,88 @@ $('upload-form').onsubmit = async event => {
     notify('Lezione importata. L’audio originale è pronto per l’ascolto.');
   } catch (e) { notify(e.message, true); }
   finally { importing = false; $('audio-file').disabled = false; button.disabled = false; $('upload-status').textContent = 'L’originale sarà conservato senza modifiche.'; }
+};
+function resetAudioState() {
+  currentLesson = null; currentAudioJob = null; audioSourceVersion++;
+  clearTimeout(audioPollTimer);
+}
+function renderAudioJob() {
+  const job = currentAudioJob;
+  const active = job && ['queued','running'].includes(job.status);
+  const completed = job && job.status === 'completed';
+  $('source-enhanced').disabled = !completed;
+  $('enhance-audio').disabled = Boolean(active || completed);
+  $('enhance-audio').textContent = completed ? 'Versione pronta' : 'Migliora audio';
+  $('cancel-enhancement').hidden = !active;
+  $('audio-progress').hidden = !active;
+  $('audio-progress').value = job ? job.progress : 0;
+  const statuses = {
+    queued:'In coda. L’elaborazione inizierà appena il motore è libero.',
+    running:`Elaborazione in corso · ${Math.floor(job ? job.progress : 0)}%`,
+    completed:'Versione pronta. Premi Migliorato per confrontarla dallo stesso punto.',
+    cancelled:'Elaborazione annullata. Puoi avviarla di nuovo.',
+    interrupted:'Elaborazione interrotta: ripartirà all’avvio del servizio.',
+    failed:'Elaborazione non riuscita. Verifica che l’originale sia presente e che ci sia spazio libero, poi riprova.'
+  };
+  $('enhancement-status').textContent = job ? statuses[job.status] || job.status : 'Scegli un’intensità e crea una versione da confrontare.';
+}
+async function refreshAudioJob() {
+  clearTimeout(audioPollTimer);
+  if (!currentLesson) return;
+  const id = currentLesson.id, preset = $('audio-preset').value;
+  const jobs = await request(`/api/v1/lessons/${encodeURIComponent(id)}/enhancements`);
+  if (!currentLesson || currentLesson.id !== id || $('audio-preset').value !== preset) return;
+  currentAudioJob = jobs.find(job => job.preset === preset) || null;
+  renderAudioJob();
+  if (currentAudioJob && ['queued','running','interrupted'].includes(currentAudioJob.status)) {
+    audioPollTimer = setTimeout(() => refreshAudioJob().catch(e => notify(e.message,true)),1200);
+  }
+}
+async function switchAudio(improved, keepPosition = true, autoplay = null) {
+  if (!currentLesson || (improved && (!currentAudioJob || currentAudioJob.status !== 'completed'))) return;
+  const player = $('player'), position = keepPosition ? player.currentTime || 0 : 0;
+  const playing = autoplay === null ? !player.paused : autoplay;
+  const rate = Number($('speed').value), sourceVersion = ++audioSourceVersion;
+  player.pause();
+  $('audio-source-label').textContent = improved ? 'AUDIO MIGLIORATO' : 'AUDIO ORIGINALE';
+  $('source-original').setAttribute('aria-pressed',String(!improved));
+  $('source-enhanced').setAttribute('aria-pressed',String(improved));
+  player.onloadedmetadata = async () => {
+    if (sourceVersion !== audioSourceVersion) return;
+    player.currentTime = Math.min(position,Math.max(0,(player.duration || position) - .05));
+    player.playbackRate = rate;
+    if (playing) try { await player.play(); } catch { notify('Premi Play nel lettore per avviare l’ascolto.',true); }
+  };
+  player.src = improved ? `/api/v1/audio-jobs/${encodeURIComponent(currentAudioJob.id)}/audio` : `/api/v1/lessons/${encodeURIComponent(currentLesson.id)}/audio`;
+  player.load();
+}
+async function openLesson(lesson) {
+  resetAudioState(); currentLesson = lesson;
+  $('playing-title').textContent = lesson.title; $('player-panel').hidden = false;
+  renderAudioJob(); switchAudio(false,false,true);
+  try { await refreshAudioJob(); } catch(e) { notify(e.message,true); }
+}
+$('source-original').onclick = () => switchAudio(false);
+$('source-enhanced').onclick = () => switchAudio(true);
+$('audio-preset').onchange = async () => {
+  switchAudio(false); currentAudioJob = null; renderAudioJob();
+  try { await refreshAudioJob(); } catch(e) { notify(e.message,true); }
+};
+$('enhance-audio').onclick = async () => {
+  if (!currentLesson) return;
+  const id = currentLesson.id;
+  $('enhance-audio').disabled = true;
+  try {
+    const job = await request(`/api/v1/lessons/${encodeURIComponent(id)}/enhancements`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({preset:$('audio-preset').value})});
+    if (currentLesson && currentLesson.id === id) { await refreshAudioJob(); }
+    notify(job.status === 'completed' ? 'La versione migliorata è già pronta.' : 'Elaborazione avviata. Puoi continuare a usare l’archivio.');
+  } catch(e) { notify(e.message,true); renderAudioJob(); }
+};
+$('cancel-enhancement').onclick = async () => {
+  if (!currentAudioJob) return;
+  const id = currentAudioJob.id;
+  try { await request(`/api/v1/audio-jobs/${encodeURIComponent(id)}/cancel`,{method:'POST'}); await refreshAudioJob(); }
+  catch(e) { notify(e.message,true); }
 };
 $('speed').onchange = () => { $('player').playbackRate = Number($('speed').value); };
 $('player').onerror = () => { if ($('player').getAttribute('src')) notify('Audio non disponibile o formato non riproducibile dal browser. Prova a riaprire la sessione.', true); };

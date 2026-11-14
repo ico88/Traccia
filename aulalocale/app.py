@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from .lessons import lessons_router, migrate_lessons
+from .enhancement import AudioWorker, enhancement_router, migrate_enhancement
 
 
 class SubjectInput(BaseModel):
@@ -42,6 +43,8 @@ def create_app(data_dir: Path | None = None, token: str | None = None) -> FastAP
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
 
+    worker = AudioWorker(root, connect)
+
     @asynccontextmanager
     async def lifespan(application):
         if len(secret) < 32 or not secret.isascii():
@@ -52,9 +55,14 @@ def create_app(data_dir: Path | None = None, token: str | None = None) -> FastAP
                 id TEXT PRIMARY KEY, title TEXT NOT NULL,
                 description TEXT NOT NULL, created_at TEXT NOT NULL)""")
             migrate_lessons(connection)
-        yield
+            migrate_enhancement(connection)
+        worker.start()
+        try:
+            yield
+        finally:
+            worker.stop()
 
-    api = FastAPI(title="AulaLocale", version="0.3.0", lifespan=lifespan,
+    api = FastAPI(title="AulaLocale", version="0.4.0", lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
     bearer = HTTPBearer(auto_error=False)
 
@@ -138,6 +146,7 @@ def create_app(data_dir: Path | None = None, token: str | None = None) -> FastAP
         return dict(record)
 
     api.include_router(lessons_router(root, connect, authenticate))
+    api.include_router(enhancement_router(root, connect, authenticate, worker))
     return api
 
 

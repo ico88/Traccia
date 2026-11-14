@@ -43,7 +43,7 @@ class Lesson(BaseModel):
 
 def migrate_lessons(connection):
     version = connection.execute("PRAGMA user_version").fetchone()[0]
-    if version > 2:
+    if version > 3:
         raise RuntimeError("Database is newer than this application; refusing to downgrade")
     connection.execute("""CREATE TABLE IF NOT EXISTS lessons (
         id TEXT PRIMARY KEY, subject_id TEXT NOT NULL REFERENCES subjects(id),
@@ -54,7 +54,8 @@ def migrate_lessons(connection):
         media_type TEXT NOT NULL, created_at TEXT NOT NULL,
         storage_name TEXT NOT NULL UNIQUE, UNIQUE(subject_id, sha256))""")
     connection.execute("CREATE INDEX IF NOT EXISTS lessons_subject_date ON lessons(subject_id, created_at, id)")
-    connection.execute("PRAGMA user_version = 2")
+    if version < 2:
+        connection.execute("PRAGMA user_version = 2")
 
 
 def inspect_audio(path: Path, suffix: str):

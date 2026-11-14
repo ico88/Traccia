@@ -1,18 +1,19 @@
-# Verifica anteprima 0.3
+# Roadmap
 
-Data: 14 novembre 2026.
+1. Fondazione: repository, workflow Git, API materie, database e test.
+2. Importazione: validazione audio, hash, asset originali, metadati e lezioni — implementati nel backend; prima interfaccia browser e lettore originale implementati.
+3. Audio: worker persistente, miglioramento tradizionale, lettore originale/derivato e prima misura sul campione reale implementati; anteprima su intervallo, qualificazione percettiva e motore IA restano da sviluppare.
+4. Trascrizione: modelli locali qualificati, segmenti, timestamp, correzioni e glossario.
+5. Dispense: fonti, capitoli incrementali, revisioni, protezione delle modifiche, immagini e schemi.
+6. Desktop: interfaccia, gestione modelli, installazione DMG e verifica offline.
+7. Server: autenticazione multiutente, isolamento, coda limitata, backup e distribuzione Linux.
 
-- 24 test automatici: materie e persistenza, importazione e validazione formati, duplicati, limiti upload, cleanup degli errori, migrazione database, accesso audio e Range, risorse web, login/logout browser, protezione delle richieste con cookie e compatibilità bearer.
-- Verifica manuale nel browser locale: accesso, creazione materia, importazione WAV da 45 secondi senza data, aggiornamento della lista, logout e nuovo accesso.
-- Ascolto avviato dal lettore sulla registrazione MP3 completa; durata visualizzata 1:14:51 e selezione velocità 1,5× verificata.
-- Layout osservato nella viewport stretta del browser di prova. Verifiche ulteriori su altri browser e dimensioni desktop ancora da completare.
+Per ogni fase: implementazione su sviluppo, test e dimostrazione, conferma del responsabile, quindi pull request e merge su main. Nessuna scadenza o prestazione promessa prima della prova tecnica.
 
-Il campione reale e gli screenshot contenenti dati di studio restano fuori dal repository. La verifica manuale conferma il flusso osservato, non costituisce una misura della qualità didattica o audio.
+## Pulizia audio integrata 0.4
 
-I test emettono un avviso di deprecazione di Starlette relativo a httpx nel TestClient; non ci sono test falliti. CI GitHub non attiva per il permesso workflow mancante nella credenziale.
+39 test superati. Aggiunti test con esecuzione FFmpeg effettiva sui tre preset, conservazione dell'originale, accesso protetto e Range sul derivato, durata del risultato, riuso dei risultati, annullamento in coda e durante l'esecuzione, nuovo tentativo, sorgente mancante, recupero di lavoro interrotto e rifiuto del secondo worker sullo stesso archivio.
 
-## Importazione assistita
+Prova locale su Mac M4 24 GB con la registrazione completa di Farmacologia: preset bilanciato, circa 6,43 secondi fra creazione e completamento del lavoro; output 53.900.252 byte. È una singola misura, non un benchmark generalizzabile. SHA-256 dell'originale invariato.
 
-30 test superati dopo l'aggiunta dei suggerimenti. Casi aggiunti: nome reale con data senza anno, data ISO completa e non valida, tag titolo/artista/data, conflitto fra data del nome e data nei tag, anteprima senza scritture nell'archivio, autenticazione e file non validi.
-
-Verificata nel browser la selezione del MP3 reale: il titolo viene ripulito e la data resta vuota con nota sull'anno mancante. L'area drag and drop e la gestione degli eventi sono implementate; il gesto di trascinamento da Finder non è stato verificato manualmente in questa sessione. Selezione tramite controllo file e lettura dei suggerimenti verificate.
+Nel browser: avvio del lavoro con avanzamento, recupero della versione dopo ricaricamento e passaggio da originale a migliorato con posizione 8,435231 secondi mantenuta e pausa preservata. Durata del derivato nel lettore: 4491,56 secondi. Nessun errore del lettore osservato. Queste prove non qualificano la qualità percettiva dei preset o l'efficacia sul rumore.
