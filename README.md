@@ -1,179 +1,158 @@
 # AulaLocale
 
-Da una lezione registrata a materiale di studio organizzato per materia, sul proprio computer.
+**Le lezioni, al loro posto.** Archivio, audio migliorato, trascrizioni e dispense per materia, con elaborazione sul proprio computer.
 
-**Progetto in sviluppo iniziale. Non è ancora disponibile un'app installabile.** Il nome è provvisorio.
+AulaLocale è un software sperimentale per studenti universitari. I file restano sul Mac o sul server su cui viene installato. I modelli si scaricano gratuitamente da Hugging Face e vengono eseguiti localmente: **nessuna API di inferenza cloud, nessun token Hugging Face nel percorso standard**.
 
-AulaLocale è pensato per studenti universitari: conservare e riascoltare le lezioni con audio migliorato, correggere le trascrizioni e costruire dispense che crescono con il corso. L'elaborazione IA sarà locale, senza API di inferenza esterne o abbonamenti obbligatori.
+Il nome è provvisorio. L'applicazione è in sviluppo e la qualità dei modelli va ancora qualificata su registrazioni universitarie rappresentative.
 
-Il codice applicativo è sul branch [`sviluppo`](https://github.com/ico88/aulalocale/tree/sviluppo); `main` conserva la documentazione iniziale fino alla prima approvazione.
-
-## Stato attuale
-
-Questa prima base implementa un'API locale con archivio SQLite, creazione e consultazione delle materie, importazione e consultazione delle lezioni, lettura dei metadati audio, conservazione e riproduzione degli originali, autenticazione tramite token locale e test automatici. Include una prima interfaccia browser locale. Implementa anche riduzione del rumore e normalizzazione tramite filtri tradizionali. Non implementa ancora trascrizione, pulizia tramite modelli IA o dispense.
+## Cosa offre questa versione
 
 | Funzione | Stato |
 |---|---|
-| Archivio persistente delle materie | API e interfaccia locale |
-| Importazione lezioni, metadati e ascolto dell’audio originale | API e interfaccia locale |
-| Miglioramento audio con filtri tradizionali e confronto allo stesso punto | Implementato |
-| Pulizia audio tramite modelli IA | Da qualificare |
-| Trascrizione italiana locale e revisione | Pianificato |
-| Dispense incrementali con fonti e versioni | Pianificato |
-| Immagini, allegati e schemi didattici | Pianificato |
-| App macOS tramite DMG | Pianificato |
-| Installazione web su server proprio | Pianificato |
+| Materie, lezioni, ricerca e importazione drag and drop | Implementato |
+| Proposte di titolo, docente e data da nome e tag audio | Implementato, sempre modificabile |
+| Conservazione degli originali, lettore e velocità regolabile | Implementato |
+| Riduzione rumore e controllo volume con tre preset | Filtri tradizionali FFmpeg |
+| Confronto originale/migliorato allo stesso punto | Implementato |
+| Trascrizione locale italiana con timestamp | Whisper Large v3 Turbo Q8 |
+| Correzioni della trascrizione in revisioni separate | Implementato |
+| Proposte di dispensa con riferimenti alle fonti | Qwen3 4B Q4_K_M, sperimentale |
+| Accettazione delle proposte e protezione delle sezioni modificate | Implementato |
+| Immagini con didascalie e mappe dei capitoli | PNG, JPEG, WebP; mappe generate localmente |
+| Esportazione | Markdown, ZIP con immagini, stampa/PDF dal browser |
+| Backup e ripristino | ZIP verificato, ripristino in una nuova cartella |
+| App Mac | Pacchetto di sviluppo generabile, non notarizzato |
+| Server Linux | Docker Compose predisposto; build container ancora da verificare |
 
-## Piattaforme obiettivo
+Sono ancora da realizzare: riduzione rumore tramite modelli IA, isolamento avanzato del docente, registrazione live, diarizzazione, estrazione automatica delle figure dalle slide, illustrazioni generative, account multiutente e distribuzione Mac firmata/notarizzata.
 
-- **Mac Apple Silicon:** macchina di riferimento Apple M4, 24 GB di memoria unificata. Mac Intel esclusi.
-- **Server:** Intel i7, 24 GB RAM; Linux come destinazione proposta. Profilo CPU con un lavoro IA alla volta, prestazioni da misurare sulla CPU specifica.
+## Un percorso semplice
 
-Questi sono ambienti di riferimento, non requisiti minimi certificati. I motori potranno differire fra Mac e server mantenendo gli stessi formati applicativi.
+1. Crea una materia e trascina la registrazione nel modulo di importazione.
+2. Controlla titolo, data e docente proposti. Le informazioni mancanti non vengono inventate.
+3. Apri la lezione: puoi ascoltare l'originale o creare una versione migliorata.
+4. Da **Modelli locali**, scarica i modelli necessari, con dimensioni e licenza visibili.
+5. Avvia la trascrizione; riascolta i timestamp e salva le correzioni.
+6. Apri **Dispensa** e prepara un aggiornamento. Controlla la proposta e i riferimenti prima di accettarla.
+7. Aggiungi immagini, modifica le sezioni e salva o esporta il materiale.
 
-## Avvio per sviluppatori
+Il testo automatico può contenere errori. Sul primo campione d'aula Whisper Small ha prodotto errori marcati; Turbo ha migliorato alcuni termini, ma non ha eliminato tutte le inesattezze. Un riferimento valido indica la fonte, non certifica da solo che una sintesi sia corretta. Le proposte delle dispense vanno confrontate con audio e trascrizioni.
 
-Python 3.11 o successivo. Dalla radice del repository, su macOS/Linux:
+## Piattaforme
+
+- **Mac Apple Silicon:** ambiente di riferimento Apple M4 con 24 GB di memoria unificata. Mac Intel esclusi.
+- **Server:** Intel i7 con 24 GB RAM, Linux come destinazione; elaborazione CPU e un lavoro alla volta. Prestazioni non ancora misurate sul server specifico.
+
+Questi sono ambienti di riferimento, non requisiti minimi certificati. I motori sono caricati in sequenza; audio, trascrizione e dispense condividono la stessa coda locale.
+
+## Avvio da sorgenti
+
+Richiede Python 3.11+, macOS o Linux. Per la compilazione dei runtime servono Git e un compilatore C/C++ (Command Line Tools su Mac; toolchain di sviluppo su Linux).
 
 ```sh
+git clone --branch sviluppo https://github.com/ico88/aulalocale.git
+cd aulalocale
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements-dev.txt
+python -m pip install cmake==4.4.4
+python scripts/setup_runtimes.py
+python -m aulalocale
+```
+
+Il launcher apre il browser e crea una sessione locale senza chiedere di copiare un token. Ascolta soltanto sul loopback, su una porta libera. **Chiudi app** arresta il servizio. I dati del launcher sono in `~/Library/Application Support/AulaLocale` su Mac e `~/.local/share/aulalocale` su Linux; `--data /percorso/archivio` permette di scegliere un altro archivio.
+
+Il primo avvio non scarica automaticamente i pesi. Aprire **Modelli locali** e avviare esplicitamente i download. Per usare il terminale senza aprire il browser: `python -m aulalocale --no-browser`.
+
+### Modalità API / sviluppo
+
+```sh
 export AULALOCALE_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export AULALOCALE_DATA_DIR=./data
 python -m uvicorn aulalocale.app:app --host 127.0.0.1 --port 8765
 ```
 
-L'API è disponibile su `http://127.0.0.1:8765`. Le risposte applicative richiedono `Authorization: Bearer <token>`. Il database viene creato in `data/`; il percorso è configurabile con `AULALOCALE_DATA_DIR`.
+Aprire `http://127.0.0.1:8765/` e inserire il token configurato. I client API possono usare `Authorization: Bearer <token>`.
 
-In un altro terminale, usando lo stesso token:
+Il cookie del browser è HttpOnly e SameSite Strict. Il token non viene salvato in localStorage e non appare negli URL audio. Il launcher usa un codice di apertura monouso nel frammento URL, rimosso immediatamente dall'interfaccia, per creare la sessione; il codice non è il token API e non viene accettato due volte. Le modifiche con sessione browser richiedono la stessa origine.
 
-```sh
-curl -H "Authorization: Bearer $AULALOCALE_TOKEN" http://127.0.0.1:8765/api/v1/subjects
-curl -X POST http://127.0.0.1:8765/api/v1/subjects   -H "Authorization: Bearer $AULALOCALE_TOKEN"   -H 'Content-Type: application/json'   -d '{"title":"Farmacologia","description":"Corso universitario"}'
-```
+Avviare un solo processo per archivio: **non usare `--workers`**. Un lock rifiuta il secondo worker. Questa versione è per un unico utilizzatore per archivio; non esporla direttamente su Internet come servizio multiutente.
 
-Il token deve essere esportato anche nel secondo terminale. `GET /health` è pubblico e riporta soltanto lo stato del servizio. Aprire `http://127.0.0.1:8765/` nel browser e inserire il token configurato per usare l’interfaccia. Il token non viene salvato in localStorage: l’accesso crea un cookie di sessione HttpOnly, SameSite Strict, valido nel browser fino a 8 ore. Il pulsante Esci elimina il cookie dal browser; cambiare il token del server invalida tutte le sessioni precedenti. La documentazione interattiva API è disattivata. Non esporre questa versione su Internet: il sistema multiutente e l'installazione server non sono ancora implementati.
+## Modelli e funzionamento offline
 
-```sh
-python -m pytest
-```
+| Modello | Download | Licenza dichiarata upstream | Impiego |
+|---|---:|---|---|
+| [Whisper Large v3 Turbo Q8](https://huggingface.co/ggerganov/whisper.cpp) | 874 MB circa | MIT | Trascrizione multilingue, italiano prioritario |
+| [Qwen3 4B Q4_K_M](https://huggingface.co/Qwen/Qwen3-4B-GGUF) | 2,50 GB circa | Apache-2.0 | Proposte di dispensa |
 
-## Architettura prevista
+Revisioni immutabili, dimensioni e SHA-256 sono fissati in `aulalocale/models.py`. I download sono riprendibili e diventano disponibili solo dopo la verifica. Nessuna lezione viene inviata a Hugging Face. I motori usano file locali; llama.cpp viene avviato in modalità offline. Un modello mancante non attiva un servizio esterno di ripiego.
 
-Interfaccia React/TypeScript condivisa fra contenitore desktop Electron e browser; backend FastAPI, SQLite e file locali; worker separati per le elaborazioni lunghe. La prima implementazione copre il backend delle materie e delle lezioni; una prima interfaccia leggera è servita direttamente da FastAPI; React/Electron rimangono lo stack previsto per l’app desktop.
+I runtime sono compilati da revisioni verificate di [whisper.cpp](https://github.com/ggml-org/whisper.cpp) e [llama.cpp](https://github.com/ggml-org/llama.cpp). In alternativa impostare `AULALOCALE_WHISPER_BIN` e `AULALOCALE_LLAMA_BIN` a eseguibili compatibili. L'adattatore llama.cpp è verificato rispetto alla revisione fissata dallo script, non a qualunque versione CLI.
 
-Candidati da qualificare: whisper.cpp per trascrivere, DeepFilterNet per ridurre il rumore, llama.cpp e un modello multilingue quantizzato per generare dispense. Le versioni, i modelli e le licenze saranno selezionati tramite benchmark, senza promettere qualità o tempi prima delle misure.
+## Audio, trascrizioni e dispense
 
-## Dati e modelli
+Importazione di MP3, WAV, M4A e FLAC fino a 512 MiB. Contenuto ed estensione devono corrispondere; la decodifica completa viene verificata prima dell'archiviazione. SHA-256 per duplicati nella stessa materia. Il limite viene applicato dopo il parsing multipart: non è ancora una protezione preventiva del traffico di un server pubblico.
 
-Audio originali conservati e derivati separati. Le future dispense avranno riferimenti alla lezione e al minuto sorgente, cronologia e protezione delle correzioni manuali. Il miglioramento audio è disponibile per il riascolto.
+Le versioni migliorate sono MP3 a 96 kbit/s con filtri passa-alto, riduzione spettrale, normalizzazione dinamica e limitatore. Possono occupare più spazio dell'originale senza recuperare dettagli che non erano presenti. I preset sono da qualificare all'ascolto; non isolano il docente dalle altre voci.
 
-Modelli gratuiti scaricabili, preferibilmente senza account o token Hugging Face. Dopo il download, obiettivo di funzionamento offline; nessun ripiego automatico verso inferenza cloud. Gratuità dei modelli non significa hardware o hosting gratuiti. Ogni licenza sarà verificata separatamente, inclusa la ridistribuzione.
+Whisper lavora sull'originale con normalizzazione del volume, in blocchi di dieci minuti. Titolo della materia, della lezione e descrizione forniscono un breve contesto al riconoscimento; i segmenti vengono separati ai confini delle parole. I timestamp sono riportati alla lezione completa; i confini dei blocchi possono influire sul riconoscimento. L'avanzamento si aggiorna al termine di ciascun blocco. Le correzioni salvano una nuova revisione, con controllo contro modifiche concorrenti. Una trascrizione corretta manualmente è protetta dalla ritrascrizione automatica.
 
-Non committare registrazioni, trascrizioni reali, dati personali, credenziali o pesi dei modelli. I campioni di sviluppo restano locali e non sono inclusi nel repository pubblico.
+Le dispense sono proposte basate sulle revisioni delle trascrizioni, con riferimenti a lezione, revisione, segmento e tempo. Il modello genera sezioni da blocchi di testo; l'organizzazione tematica e la deduplicazione semantica richiedono ulteriore qualificazione. Le sezioni modificate manualmente vengono preservate. Fonti cambiate e proposte basate su versioni superate sono segnalate e, quando necessario, ne viene impedita l'accettazione. Le revisioni precedenti restano nel database; la cronologia delle trascrizioni è consultabile dall’interfaccia in sola lettura.
 
-## Branch e contributi
+Immagini fino a 20 MiB e 20 megapixel vengono validate e ricodificate in PNG. Per ora sono materiali della materia, non figure collocate automaticamente in punti specifici dei capitoli. È possibile generare localmente una mappa dei capitoli dalla dispensa accettata: è un indice visivo dei primi 12 capitoli, non una mappa di relazioni causali. Il PDF usa la funzione di stampa del browser, non un generatore PDF lato server.
 
-- `main`: base approvata; promozioni soltanto dopo conferma del responsabile del progetto.
-- `sviluppo`: ramo di lavoro e integrazione.
-- Passaggio tramite pull request `sviluppo` → `main`, con test e conferma esplicita prima del merge. Nessun auto-merge.
+## Backup
 
-Il primo commit su `main` contiene soltanto la costituzione del repository; il codice applicativo nasce su `sviluppo`.
-
-Consultare [CONTRIBUTING.md](CONTRIBUTING.md), [architettura](docs/architecture.md) e [roadmap](docs/roadmap.md).
-
-## Licenza e riferimenti
-
-La licenza del codice deve ancora essere scelta dal titolare. Repository pubblico non equivale a licenza open source; nessuna licenza di riuso viene concessa implicitamente. Le dipendenze mantengono le proprie licenze.
-
-[VoiceStudio](https://github.com/debpalash/voicestudio) è un riferimento per l'esperienza di installazione e gestione modelli. Non è stato copiato codice da VoiceStudio e questo progetto non è affiliato al suo autore.
-
-## Attivazione della CI
-
-I test sono eseguibili localmente. Il modello di workflow è in `docs/ci-workflow.yml`: deve essere spostato in `.github/workflows/ci.yml` quando la credenziale GitHub dispone del permesso `workflow`. La CI GitHub non è ancora attiva. Dopo la prima esecuzione, rendere obbligatorio il controllo `backend-tests` nella protezione di `main`.
-
-## Importare una lezione
-
-Sono accettati MP3, WAV, M4A e FLAC, fino a 512 MiB per file. L'importazione legge il contenuto, verifica che corrisponda all'estensione e prova a decodificare tutta la traccia audio con FFmpeg locale. Il pacchetto `imageio-ffmpeg` fornisce il binario: non serve un'installazione separata nel percorso standard.
-
-Sostituire `SUBJECT_ID` con l'identificativo restituito dalla creazione della materia:
+**Esporta backup** crea uno ZIP con uno snapshot SQLite, audio originali, versioni completate e immagini, con manifest SHA-256. Non include modelli, runtime o credenziali. Il ripristino non sovrascrive archivi esistenti:
 
 ```sh
-curl -X POST http://127.0.0.1:8765/api/v1/subjects/SUBJECT_ID/lessons \
-  -H "Authorization: Bearer $AULALOCALE_TOKEN" \
-  -F 'title=Introduzione alla materia' \
-  -F 'teacher=Docente' \
-  -F 'lecture_date=2026-10-31' \
-  -F 'file=@/percorso/lezione.mp3'
+python -m aulalocale.restore /percorso/aulalocale-backup.zip --data /percorso/nuovo-archivio
 ```
 
-Titolo obbligatorio; docente e data facoltativi. Il server restituisce identificativo, hash SHA-256, dimensione, durata stimata dai metadati, frequenza di campionamento e numero di canali. Non restituisce percorsi locali. La copia archiviata mantiene esattamente i byte dell'originale e usa un nome interno generato dall'app.
+Il ripristino verifica percorsi, checksum, integrità e versione del database. Modelli e runtime devono essere installati separatamente. Un lavoro interrotto riparte dall'inizio della fase al successivo avvio; non riprende dal campione o token esatto.
 
-| Metodo | Endpoint | Risultato |
-|---|---|---|
-| POST | `/api/v1/subjects/{id}/lessons` | Importazione multipart |
-| GET | `/api/v1/subjects/{id}/lessons?limit=50&offset=0` | Lezioni della materia |
-| GET | `/api/v1/lessons/{id}` | Metadati della lezione |
-| GET | `/api/v1/lessons/{id}/audio` | Audio originale, con richieste HTTP Range |
+## Pacchetto Mac di sviluppo
 
-Tutti richiedono il token bearer, incluso l'audio; il futuro lettore dovrà gestire questa autenticazione. I duplicati identici nella stessa materia restituiscono HTTP 409 con il riferimento alla lezione esistente. Lo stesso audio può essere associato a materie diverse, per ora con copie distinte.
+Su Apple Silicon, dopo aver compilato i runtime:
 
-La validazione è sincrona con timeout di 180 secondi: la coda persistente arriverà nella fase successiva. Gli import falliti vengono ripuliti; un arresto improvviso del processo fra filesystem e commit SQLite può lasciare file orfani, la cui riconciliazione non è ancora implementata. Il limite applicativo viene verificato dopo il parsing multipart e durante la copia: non è ancora un limite preventivo sul traffico HTTP; per questo la versione rimane esclusivamente locale.
+```sh
+python -m pip install pyinstaller==6.22.3
+python scripts/build_macos.py --output ./dist-macos --dmg
+```
 
-L'aggiornamento del database dalla versione 1 alla 2 conserva le materie esistenti. Non sono supportati downgrade del database.
+Il pacchetto include Python, dipendenze e runtime nativi, mentre i pesi vengono scaricati successivamente dall'app. L'interfaccia si apre nel browser di sistema. È un launcher desktop, non ancora un contenitore Electron. Il build è di sviluppo: firma Developer ID, notarizzazione, aggiornamenti automatici e verifica su un secondo Mac pulito restano da completare.
 
-## Dipendenze audio
+## Server proprio
 
-Mutagen è utilizzato per i metadati (licenza GPL, vedere il pacchetto upstream). `imageio-ffmpeg` distribuisce un binario FFmpeg con condizioni proprie della build. Queste dipendenze richiedono una verifica di compatibilità prima della scelta della licenza del prodotto e della distribuzione di installer. Nessun codice VoiceStudio è incluso.
+Sono inclusi `Dockerfile`, `compose.yaml` e `.env.example`. Copiare `.env.example` in `.env`, impostare un token casuale di almeno 32 caratteri e avviare:
 
-## Interfaccia locale (anteprima 0.3)
+```sh
+docker compose up --build -d
+```
 
-La pagina iniziale permette di accedere, creare e scegliere materie, caricare registrazioni con titolo, docente e data, consultare i metadati e ascoltare l'originale. Il lettore offre i controlli nativi del browser e velocità da 0,75× a 2×. Le materie e le lezioni vengono caricate mediante paginazione; testo inserito dagli utenti viene reso come testo semplice.
+Il Compose pubblica soltanto `127.0.0.1:8765`, conserva l'archivio in un volume e non scarica automaticamente i modelli. La configurazione è predisposta ma il build Docker non è stato eseguito nell'ambiente di sviluppo corrente. Accesso remoto con HTTPS, gestione delle origini dietro proxy e utenti separati richiedono una successiva validazione.
 
-Le operazioni con sessione browser richiedono la stessa origine dell'applicazione; gli altri client continuano a poter usare il token bearer. Le risorse dell'interfaccia sono incluse nel repository, senza CDN o font esterni. Questa prima interfaccia usa HTML/CSS/JavaScript senza build Node per rendere verificabile il flusso completo prima del contenitore desktop. La distribuzione multiutente resta da implementare.
+## Sviluppo e verifiche
 
-Il caricamento mostra uno stato di attesa durante upload e validazione, senza percentuali simulate. La compatibilità di riproduzione dipende anche dai codec del browser. Le funzionalità IA non vengono simulate nell'interfaccia: pulizia, trascrizione e dispense sono ancora pianificate.
+```sh
+python -m pytest -q
+```
 
-## Importazione assistita
+Test con segnali sintetici, nessuna registrazione personale nel repository. Sono coperti autenticazione, archivio, Range audio, filtri effettivi FFmpeg, annullamento e recupero, revisioni, fonti, proposte, download e checksum, immagini, backup e ripristino. I test dell'orchestrazione delle dispense usano un adattatore controllato: sono distinti dalle prove reali dei modelli. Dettagli in [docs/verification.md](docs/verification.md).
 
-Nel modulo Aggiungi lezione è possibile trascinare una singola registrazione nell'area dedicata oppure selezionarla con il controllo file, utilizzabile anche da tastiera.
+La CI GitHub non è ancora attiva: il token utilizzato per creare il repository non ha lo scope `workflow`. Il modello di workflow è conservato in `docs/ci-workflow.yml`; dopo l'attivazione, il controllo `backend-tests` andrà reso obbligatorio su `main`.
 
-Prima del salvataggio l'app propone:
+## Branch
 
-- Titolo: tag del file quando presente, altrimenti nome ripulito da prefisso della materia e data riconosciuta.
-- Docente: tag artista, se disponibile, con avviso di verifica; il tag artista non garantisce l'identità del docente.
-- Data: data completa ISO nei tag o nel nome. Date senza anno, come `10-31`, non vengono completate automaticamente.
+- **`sviluppo`**: codice e integrazione quotidiana.
+- **`main`**: base approvata, attualmente documentazione iniziale.
+- Promozioni tramite pull request e solo dopo conferma esplicita del responsabile. Nessun auto-merge.
 
-Le proposte sono modificabili e riportano la provenienza. I campi compilati manualmente non vengono sovrascritti quando arriva la risposta dei metadati. Non viene ancora analizzato il parlato: il riconoscimento semantico del titolo e del docente richiede la futura pipeline di trascrizione.
+Leggere [CONTRIBUTING.md](CONTRIBUTING.md), [architettura](docs/architecture.md) e [roadmap](docs/roadmap.md). Non committare audio, trascrizioni reali, dati personali, chiavi, modelli o runtime compilati.
 
-L'endpoint autenticato `POST /api/v1/audio/preview` riceve un file multipart e legge i tag senza creare lezioni o originali nell'archivio. Per ora il file viene inviato al backend locale una volta per l'anteprima e nuovamente all'importazione; il riuso di un upload temporaneo è un miglioramento futuro, soprattutto per la distribuzione server. Se i metadati non sono leggibili si può compilare manualmente; la decodifica completa avviene comunque all'importazione.
+## Licenze e riferimenti
 
-## Pulizia audio integrata (anteprima 0.4)
+La licenza del codice del progetto deve ancora essere scelta dal titolare: repository pubblico non equivale a licenza open source. Le dipendenze mantengono le proprie condizioni; in particolare Mutagen è GPL, e FFmpeg richiede la verifica della build effettivamente distribuita. La compatibilità delle licenze va chiusa prima di distribuire una release del prodotto.
 
-Aprire una lezione, scegliere l'intensità e premere **Migliora audio**. Il risultato viene salvato separatamente dall'originale; i pulsanti **Originale / Migliorato** consentono di confrontare le versioni mantenendo la posizione, la velocità e lo stato pausa/riproduzione. Le versioni dei diversi preset restano disponibili scegliendo la relativa intensità.
-
-- Leggera: riduzione rumore e guadagno più contenuti.
-- Bilanciata: impostazione di partenza per il confronto.
-- Intensa: trattamento più marcato, da valutare per possibili artefatti.
-
-Questa versione usa FFmpeg: passa-alto, riduzione spettrale, normalizzazione dinamica e limitatore con compensazione della latenza. Non isola il docente dalle altre persone e non usa ancora modelli IA. I preset non sono stati qualificati percettivamente su un insieme di lezioni; un volume maggiore non dimostra da solo una migliore intelligibilità.
-
-Il risultato è un MP3 a 96 kbit/s: può occupare più spazio dell'originale senza recuperare dettagli assenti nella registrazione. L'originale non viene modificato. La durata utile rimane invariata nella prova completa effettuata; l'allineamento dovrà essere validato su altri formati prima della sincronizzazione con trascrizioni.
-
-### Coda e ripresa
-
-SQLite conserva lavori, preset, parametri, motore e avanzamento. Un thread di orchestrazione avvia un processo FFmpeg alla volta, lasciando libere le API e l'interfaccia. L'avanzamento deriva dal tempo audio elaborato; il 100% viene mostrato solo dopo la pubblicazione del risultato.
-
-L'annullamento ferma il processo e ripulisce il risultato parziale. Al riavvio i lavori rimasti in esecuzione o interrotti ripartono dall'inizio della fase; non riprendono dal campione esatto. I risultati completati vengono riutilizzati a parità di lezione, preset e filtri. La migrazione porta il database alla versione 3.
-
-Avviare **un solo processo Uvicorn per archivio**, senza `--workers`: un lock di filesystem rifiuta un secondo worker sullo stesso archivio. La coda è locale a questa installazione; non è una coda distribuita. Non sono ancora disponibili anteprima su intervallo, regolazione continua dei filtri o gestione grafica globale di tutti i lavori.
-
-| Metodo | Endpoint | Risultato |
-|---|---|---|
-| POST | `/api/v1/lessons/{id}/enhancements` | Crea/riutilizza un lavoro; JSON `{"preset":"balanced"}` |
-| GET | `/api/v1/lessons/{id}/enhancements` | Versioni e lavori della lezione |
-| GET | `/api/v1/audio-jobs/{id}` | Stato e avanzamento |
-| POST | `/api/v1/audio-jobs/{id}/cancel` | Annulla un lavoro attivo |
-| GET | `/api/v1/audio-jobs/{id}/audio` | Versione completata, con supporto Range |
-
-Tutti gli endpoint richiedono autenticazione. Nessun audio o metadato viene inviato a servizi esterni di elaborazione.
+[VoiceStudio](https://github.com/debpalash/voicestudio) è un riferimento per l'esperienza di installazione e gestione modelli. Non è stato copiato il suo codice e AulaLocale non è affiliato al progetto.

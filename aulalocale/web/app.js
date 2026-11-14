@@ -22,14 +22,16 @@ function signedOut() {
 }
 async function request(path, options = {}) {
   let response;
-  try { response = await fetch(path, {credentials: 'same-origin', ...options}); }
+  const {allowMissing = false, ...fetchOptions} = options;
+  try { response = await fetch(path, {credentials: 'same-origin', ...fetchOptions}); }
   catch (error) { if (error.name === 'AbortError') throw error; throw new Error('Connessione interrotta. Verifica che AulaLocale sia in esecuzione.'); }
   if (response.status === 401) { signedOut(); throw new Error('Accesso richiesto. Inserisci il token locale.'); }
+  if (response.status === 404 && allowMissing) return null;
   if (!response.ok) {
     let detail; try { detail = (await response.json()).detail; } catch { /* generic below */ }
     if (response.status === 409) throw new Error(typeof detail === 'string' ? detail : 'Questa registrazione è già presente nella materia.');
     if (response.status === 413) throw new Error('Il file supera il limite di 512 MiB.');
-    if (response.status === 422) throw new Error('Controlla i campi e il formato audio. Il file deve essere decodificabile e corrispondere all’estensione.');
+    if (response.status === 422) throw new Error(typeof detail === 'string' ? detail : 'Controlla i campi e il formato audio.');
     if (response.status === 507) throw new Error('Impossibile salvare: controlla spazio libero e permessi.');
     throw new Error(typeof detail === 'string' ? detail : 'Operazione non riuscita. Riprova.');
   }
@@ -61,13 +63,15 @@ function renderLessons() {
   $('empty').hidden = lessons.length > 0;
   $('lesson-count').textContent = lessons.length;
   $('total-duration').textContent = duration(lessons.reduce((sum, l) => sum + l.duration_seconds, 0));
-  for (const lesson of lessons) {
-    const card = document.createElement('article'); card.className = 'lesson-card';
+  const query = $('lesson-search').value.trim().toLocaleLowerCase('it');
+  const visible = lessons.filter(lesson => [lesson.title,lesson.teacher,lesson.lecture_date || ''].join(' ').toLocaleLowerCase('it').includes(query));
+  for (const lesson of visible) {
+    const card = document.createElement('article'); card.className = 'lesson-card' + (currentLesson && currentLesson.id === lesson.id ? ' active' : '');
     const play = document.createElement('button'); play.className = 'play-button'; play.textContent = '▶';
     play.setAttribute('aria-label', `Ascolta ${lesson.title}`);
-    play.onclick = () => openLesson(lesson);
+    play.onclick = () => openLesson(lesson,true);
     const details = document.createElement('div'); details.className = 'lesson-details';
-    const title = document.createElement('h3'); title.textContent = lesson.title;
+    const title = document.createElement('h3'); const open=document.createElement('button'); open.className='lesson-title'; open.textContent=lesson.title; open.onclick=()=>openLesson(lesson,false); title.append(open);
     const meta = document.createElement('p');
     const date = lesson.lecture_date ? new Date(`${lesson.lecture_date}T12:00:00`).toLocaleDateString('it-IT') : 'Data non indicata';
     meta.textContent = [date, duration(lesson.duration_seconds), lesson.teacher, `${(lesson.size_bytes / 1048576).toFixed(1)} MiB`].filter(Boolean).join(' · ');
@@ -77,8 +81,11 @@ function renderLessons() {
   }
 }
 async function selectSubject(id) {
+  if (typeof mayLeaveTranscript === 'function' && !mayLeaveTranscript()) return;
   const version = ++loadingVersion;
   resetAudioState();
+  if (typeof showStudyView === 'function') showStudyView('library');
+  $('lesson-search').value = '';
   selected = id; renderSubjects();
   const subject = subjects.find(s => s.id === id);
   $('subject-title').textContent = subject.title;
@@ -110,6 +117,7 @@ $('login-form').onsubmit = async event => {
   catch (e) { notify(e.message, true); } finally { button.disabled = false; }
 };
 $('logout').onclick = async () => {
+  if (typeof mayLeaveTranscript === 'function' && !mayLeaveTranscript()) return;
   try { await request('/api/v1/session', {method:'DELETE'}); signedOut(); }
   catch (e) { notify(e.message, true); }
 };
@@ -206,6 +214,7 @@ $('upload-form').onsubmit = async event => {
   finally { importing = false; $('audio-file').disabled = false; button.disabled = false; $('upload-status').textContent = 'L’originale sarà conservato senza modifiche.'; }
 };
 function resetAudioState() {
+  if (typeof resetStudy === 'function') resetStudy();
   currentLesson = null; currentAudioJob = null; audioSourceVersion++;
   clearTimeout(audioPollTimer);
 }
@@ -259,11 +268,13 @@ async function switchAudio(improved, keepPosition = true, autoplay = null) {
   player.src = improved ? `/api/v1/audio-jobs/${encodeURIComponent(currentAudioJob.id)}/audio` : `/api/v1/lessons/${encodeURIComponent(currentLesson.id)}/audio`;
   player.load();
 }
-async function openLesson(lesson) {
-  resetAudioState(); currentLesson = lesson;
+async function openLesson(lesson, autoplay = false) {
+  if (typeof mayLeaveTranscript === 'function' && !mayLeaveTranscript()) return false;
+  resetAudioState(); currentLesson = lesson; renderLessons();
   $('playing-title').textContent = lesson.title; $('player-panel').hidden = false;
-  renderAudioJob(); switchAudio(false,false,true);
-  try { await refreshAudioJob(); } catch(e) { notify(e.message,true); }
+  renderAudioJob(); switchAudio(false,false,autoplay);
+  try { await refreshAudioJob(); await loadStudy(); } catch(e) { notify(e.message,true); }
+  return true;
 }
 $('source-original').onclick = () => switchAudio(false);
 $('source-enhanced').onclick = () => switchAudio(true);
@@ -289,4 +300,21 @@ $('cancel-enhancement').onclick = async () => {
 };
 $('speed').onchange = () => { $('player').playbackRate = Number($('speed').value); };
 $('player').onerror = () => { if ($('player').getAttribute('src')) notify('Audio non disponibile o formato non riproducibile dal browser. Prova a riaprire la sessione.', true); };
-openWorkspace().catch(e => { if (!$('login-view').hidden) return; notify(e.message, true); });
+async function bootstrapWorkspace() {
+  const access = new URLSearchParams(window.location.hash.slice(1)).get('access');
+  if (access) {
+    window.history.replaceState(null, '', window.location.pathname);
+    await request('/api/v1/desktop-session', {method:'POST',headers:{'X-Desktop-Access':access}});
+  }
+  await openWorkspace();
+  const environment=await request('/api/v1/environment');
+  $('quit-desktop').hidden=!environment.desktop;
+}
+$('quit-desktop').onclick=async()=>{
+  if (typeof mayLeaveTranscript === 'function' && !mayLeaveTranscript()) return;
+  try {await request('/api/v1/shutdown',{method:'POST'});signedOut();notify('AulaLocale è stata chiusa. Puoi chiudere questa scheda.');}
+  catch(e){notify(e.message,true);}
+};
+bootstrapWorkspace().catch(e => { if (!$('login-view').hidden) return; notify(e.message, true); });
+
+$('lesson-search').oninput = renderLessons;

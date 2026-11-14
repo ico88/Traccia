@@ -5,3 +5,5 @@ pydantic==2.14.3
 python-multipart==0.0.33
 mutagen==1.48.1
 imageio-ffmpeg==0.8.1
+certifi==2026.10.23
+Pillow==13.0.0

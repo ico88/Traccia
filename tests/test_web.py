@@ -40,3 +40,17 @@ def test_cookie_csrf_protection_and_bearer_compatibility(tmp_path):
         assert client.get('/api/v1/subjects', headers={'Authorization':'Bearer incorrect'}).status_code == 401
         assert client.post('/api/v1/subjects', headers=AUTH, json={'title':'CLI'}).status_code == 201
         assert len(client.get('/api/v1/subjects').json()) == 1
+
+
+def test_desktop_bootstrap_is_same_origin_and_single_use(tmp_path):
+    nonce='one-time-desktop-code-'*3
+    closed=[]
+    app=create_app(tmp_path,TOKEN,bootstrap_nonce=nonce,shutdown_callback=lambda:closed.append(True))
+    with TestClient(app) as client:
+        headers={'X-Desktop-Access':nonce}
+        assert client.post('/api/v1/desktop-session',headers=headers).status_code==403
+        assert client.post('/api/v1/desktop-session',headers={**headers,**ORIGIN}).status_code==204
+        assert client.get('/api/v1/environment').json()=={'desktop':True}
+        assert client.post('/api/v1/desktop-session',headers={**headers,**ORIGIN}).status_code==401
+        assert client.post('/api/v1/shutdown',headers=ORIGIN).status_code==204
+        assert closed==[True]

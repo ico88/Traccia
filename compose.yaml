@@ -1,0 +1,14 @@
+services:
+  aulalocale:
+    build: .
+    ports:
+      - "127.0.0.1:8765:8765"
+    environment:
+      AULALOCALE_TOKEN: ${AULALOCALE_TOKEN:?Set AULALOCALE_TOKEN in .env first}
+      AULALOCALE_DATA_DIR: /data
+    volumes:
+      - archive:/data
+    restart: unless-stopped
+    stop_grace_period: 45s
+volumes:
+  archive:

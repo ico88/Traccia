@@ -1,27 +1,31 @@
-# Architettura
+# Architettura 0.5
 
-## Implementato
+## Applicazione
 
-FastAPI espone health e API versionate per creare, elencare e leggere materie. SQLite conserva i dati fra riavvii. Un token bearer configurato protegge tutte le API applicative. La configurazione senza token fallisce all'avvio. Nessuna CORS permissiva e documentazione pubblica disabilitata. Interfaccia locale statica con CSP restrittiva. Accesso browser mediante cookie HttpOnly/SameSite Strict derivato dal token server, mai inserito negli URL audio. Richieste con cookie soggette a controllo di origine; client bearer ancora supportati. Logout elimina il cookie locale; il token server deve cambiare per revocare tutte le sessioni. Non è ancora un servizio di autenticazione multiutente.
+FastAPI e SQLite, un singolo utilizzatore per archivio. Interfaccia HTML/CSS/JavaScript locale, senza CDN. Il contenitore React/Electron rimane una possibile evoluzione; il launcher Mac corrente include il runtime Python e apre il browser di sistema.
 
-Le lezioni hanno una chiave esterna verso la materia e un vincolo univoco su materia/hash. Gli originali sono in `data/originals`, gli upload provvisori in `data/staging`. Il nome fornito dal client viene conservato solo come metadato; il percorso archiviato è generato dal server. La validazione legge metadati e decodifica il contenuto prima di creare la lezione. Gli errori gestiti eliminano i file temporanei e le copie non registrate. Gli arresti improvvisi richiederanno una futura riconciliazione degli orfani.
+`app.py` configura autenticazione, risorse web e lifecycle. `lessons.py` gestisce importazione e originali; `suggestions.py` legge nome e tag. `enhancement.py` orchestra il worker seriale e i processi FFmpeg. `study.py` implementa trascrizioni, revisioni e proposte di dispensa. `models.py` contiene catalogo fissato, download e verifica. `materials.py` gestisce immagini e backup. `restore.py` ripristina esclusivamente in una nuova cartella.
 
-Migrazione additiva alla versione schema 2, con conservazione delle materie. La versione API corrente è 0.4.0.
+## Persistenza
 
-Questa base è per uso locale e singolo utente. Il token protegge le richieste, ma non sostituisce TLS, gestione delle sessioni e isolamento degli utenti della futura versione server. L'avvio documentato usa esclusivamente il loopback.
+Schema 5, migrazioni additive. Materie, lezioni, lavori audio, lavori di studio, trascrizioni immutabili con revisioni, dispense accettate/proposte e immagini. Le API di modifica usano la revisione di base per evitare di sovrascrivere aggiornamenti concorrenti.
 
-## Previsto
+Originali con nomi interni generati; immagini ricodificate in PNG. File temporanei dei processi separati dai risultati pubblicati. Filesystem e SQLite non sono una singola transazione: un arresto improvviso dell'importazione può lasciare orfani da riconciliare. Il backup usa snapshot SQLite, file immutabili e manifest SHA-256.
 
-React/TypeScript con Electron sul Mac e browser sul server. Worker separati per conversione, audio, trascrizione e dispense; coda persistente con dipendenze e recupero dall'ultima fase completata. Asset originali immutabili; derivati e revisioni espliciti.
+## Coda e motori
 
-Blocchi della dispensa collegati a revisione della trascrizione e segmenti temporali. Aggiornamenti proposti prima dell'applicazione, con modifiche manuali protette. Correzioni e rimozioni delle fonti invalidano le dipendenze senza cancellazioni automatiche.
+Un thread orchestratore, con lock esclusivo per archivio, avvia un solo processo di elaborazione alla volta. Prima cerca lavori audio, poi lavori di studio; una politica di priorità equa è ancora da implementare. L'annullamento ferma il processo nativo. Dopo il riavvio i lavori interrotti ripartono dall'inizio della fase.
 
-Profilo Mac M4 24 GB e server i7 24 GB. Una sola elaborazione IA alla volta all'inizio; caricamento sequenziale dei modelli. Modelli e accelerazione da scegliere tramite misure. Nessun benchmark ancora completato per i motori IA.
+Whisper riceve WAV mono 16 kHz normalizzati, in blocchi di dieci minuti. Risultati con segmenti temporali e revisione del modello. Il profilo corrente usa Large v3 Turbo Q8. Le revisioni manuali restano protette; la ritrascrizione di una versione automatica richiede l'identificativo esatto della revisione corrente e non elimina quella precedente.
 
-## Elaborazione audio implementata
+Qwen3 4B Q4_K_M tramite llama.cpp offline genera JSON vincolato a schema. Gli id delle citazioni devono appartenere agli input; il controllo è strutturale e non dimostra il sostegno semantico di ogni affermazione. Una proposta non sostituisce automaticamente la dispensa. I capitoli manuali vengono preservati; la classificazione tematica e la deduplicazione richiedono ulteriore lavoro.
 
-Schema 3: `audio_jobs` collega una lezione al preset, stato, avanzamento, errore, filtri e versione del motore. Un indice univoco parziale impedisce più lavori attivi per lezione e preset. Il thread di orchestrazione esegue un processo FFmpeg alla volta. Un lock `flock` mantiene un solo worker per archivio su macOS/Linux.
+Download dei pesi separato dall'inferenza: un download alla volta, revisioni immutabili, dimensione e SHA-256 verificati. Nessun upload di contenuti di studio o inferenza remota. I runtime sono compilati separatamente da sorgenti upstream verificati; nel pacchetto Mac vengono inclusi, insieme a Python e FFmpeg.
 
-Output temporaneo in `enhanced/{job-id}.part.mp3`, rinomina atomica al termine e stato completato solo dopo il risultato. I lavori interrotti vengono rimessi in coda al successivo avvio e il relativo output parziale viene sostituito. Gli output non completati vengono rimossi in caso di errori gestiti e annullamento. Originali in sola lettura per il worker.
+## Accesso
 
-La pubblicazione filesystem e il commit SQLite non costituiscono una transazione unica. In caso di crash fra le due operazioni, il recupero del lavoro non completato ripete la fase. Non sono ancora implementati checksum dei derivati né riconciliazione dei risultati completati rimossi esternamente.
+API bearer o cookie HttpOnly/SameSite Strict. Verifica di origine per richieste browser con cookie; nessuna CORS permissiva. Cookie con nome derivato dalla configurazione per evitare collisioni fra istanze locali. Interfaccia con CSP restrittiva, testo utente reso tramite textContent e immagini eseguibili non accettate.
+
+Il launcher desktop genera token e codice di apertura monouso, ascolta solo sul loopback e passa al browser il codice nel frammento URL. L'interfaccia lo rimuove prima di creare la sessione. Il codice non viene scritto nei log HTTP e non è riutilizzabile. Chiudi app arresta il servizio dopo la risposta.
+
+La modalità server è ancora singolo utente. Il Compose si lega al loopback; reverse proxy, HTTPS e isolamento fra utenti devono essere progettati e verificati prima di una pubblicazione remota.

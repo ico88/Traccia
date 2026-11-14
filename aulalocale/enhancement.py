@@ -49,7 +49,8 @@ def migrate_enhancement(connection):
         engine TEXT NOT NULL, filter TEXT NOT NULL)''')
     connection.execute('''CREATE UNIQUE INDEX IF NOT EXISTS audio_jobs_active
         ON audio_jobs(lesson_id,preset) WHERE status IN ('queued','running')''')
-    connection.execute('PRAGMA user_version = 3')
+    if connection.execute('PRAGMA user_version').fetchone()[0] < 3:
+        connection.execute('PRAGMA user_version = 3')
 
 
 def now():
@@ -77,6 +78,8 @@ class AudioWorker:
         self.outputs.mkdir(exist_ok=True)
         with closing(self.connect()) as connection, connection:
             connection.execute("UPDATE audio_jobs SET status='queued',progress=0,error=NULL,updated_at=? WHERE status IN ('running','interrupted')", (now(),))
+        if getattr(self, 'study', None):
+            self.study.recover()
         self.thread = Thread(target=self.run, name='audio-worker', daemon=True)
         self.thread.start()
 
@@ -124,6 +127,8 @@ class AudioWorker:
                     row = connection.execute("SELECT * FROM audio_jobs WHERE status='queued' ORDER BY created_at,id LIMIT 1").fetchone()
                 if row:
                     self.execute(dict(row))
+                    continue
+                if getattr(self, 'study', None) and self.study.next():
                     continue
             except Exception:
                 # An unavailable database must not cause a busy retry loop.

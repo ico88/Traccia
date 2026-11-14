@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 import hmac
 import os
 import sqlite3
+from threading import Lock
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
@@ -14,6 +15,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from .lessons import lessons_router, migrate_lessons
 from .enhancement import AudioWorker, enhancement_router, migrate_enhancement
+from .models import ModelManager, models_router
+from .materials import migrate_materials, materials_router
+from .study import StudyEngine, study_router, migrate_study
 
 
 class SubjectInput(BaseModel):
@@ -32,7 +36,7 @@ class Subject(SubjectInput):
     created_at: datetime
 
 
-def create_app(data_dir: Path | None = None, token: str | None = None) -> FastAPI:
+def create_app(data_dir: Path | None = None, token: str | None = None, bootstrap_nonce: str | None = None, shutdown_callback=None) -> FastAPI:
     secret = token if token is not None else os.environ.get("AULALOCALE_TOKEN", "")
     root = data_dir if data_dir is not None else Path(os.environ.get("AULALOCALE_DATA_DIR", "data"))
     database = root / "aulalocale.sqlite3"
@@ -44,6 +48,9 @@ def create_app(data_dir: Path | None = None, token: str | None = None) -> FastAP
         return connection
 
     worker = AudioWorker(root, connect)
+    models = ModelManager(root)
+    study = StudyEngine(root, connect, worker, models)
+    worker.study = study
 
     @asynccontextmanager
     async def lifespan(application):
@@ -56,17 +63,21 @@ def create_app(data_dir: Path | None = None, token: str | None = None) -> FastAP
                 description TEXT NOT NULL, created_at TEXT NOT NULL)""")
             migrate_lessons(connection)
             migrate_enhancement(connection)
+            migrate_study(connection)
+            migrate_materials(connection)
         worker.start()
         try:
             yield
         finally:
             worker.stop()
+            models.close()
 
-    api = FastAPI(title="AulaLocale", version="0.4.0", lifespan=lifespan,
+    api = FastAPI(title="AulaLocale", version="0.5.0", lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
     bearer = HTTPBearer(auto_error=False)
 
-    session_cookie = "aulalocale_session"
+    session_cookie = "aulalocale_session_" + hmac.new(secret.encode(), b"cookie-name", "sha256").hexdigest()[:12]
+    bootstrap_lock = Lock()
     session_value = hmac.new(secret.encode(), b"browser-session-v1", "sha256").hexdigest()
 
     def unauthorized():
@@ -87,6 +98,31 @@ def create_app(data_dir: Path | None = None, token: str | None = None) -> FastAP
             raise HTTPException(403, "Cross-origin session request refused")
         if request.method not in {"GET", "HEAD", "OPTIONS"} and origin != expected_origin:
             raise HTTPException(403, "Same-origin request required")
+
+    @api.get("/api/v1/environment", dependencies=[Depends(authenticate)])
+    def environment():
+        return {"desktop": shutdown_callback is not None}
+
+    @api.post("/api/v1/desktop-session", status_code=204)
+    def desktop_session(request: Request, response: Response):
+        nonlocal bootstrap_nonce
+        supplied = request.headers.get("X-Desktop-Access", "")
+        if request.headers.get("origin") != str(request.base_url).rstrip("/"):
+            raise HTTPException(403, "Same-origin request required")
+        with bootstrap_lock:
+            if not bootstrap_nonce or not hmac.compare_digest(supplied.encode(), bootstrap_nonce.encode()):
+                unauthorized()
+            bootstrap_nonce = None
+        response.set_cookie(session_cookie, session_value, httponly=True, samesite="strict",
+                            secure=request.url.scheme == "https", path="/api/v1", max_age=28800)
+        response.headers["Cache-Control"] = "no-store"
+
+    @api.post("/api/v1/shutdown", status_code=204, dependencies=[Depends(authenticate)])
+    def shutdown(response: Response):
+        if shutdown_callback is None:
+            raise HTTPException(404, "Only available in desktop mode")
+        from starlette.background import BackgroundTask
+        return Response(status_code=204, background=BackgroundTask(shutdown_callback))
 
     @api.post("/api/v1/session", status_code=204)
     def login(request: Request, response: Response,
@@ -147,6 +183,9 @@ def create_app(data_dir: Path | None = None, token: str | None = None) -> FastAP
 
     api.include_router(lessons_router(root, connect, authenticate))
     api.include_router(enhancement_router(root, connect, authenticate, worker))
+    api.include_router(models_router(models, authenticate))
+    api.include_router(study_router(study, authenticate))
+    api.include_router(materials_router(root, connect, authenticate, worker))
     return api
 
 

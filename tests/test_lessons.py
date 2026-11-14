@@ -140,5 +140,5 @@ def test_upgrade_existing_database(tmp_path):
     with TestClient(create_app(tmp_path, TOKEN)) as client:
         assert client.get("/health").status_code == 200
     with sqlite3.connect(tmp_path / "aulalocale.sqlite3") as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 5
         assert conn.execute("SELECT title FROM subjects WHERE id='old'").fetchone()[0] == "Existing"

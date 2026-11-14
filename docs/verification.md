@@ -17,3 +17,18 @@ Per ogni fase: implementazione su sviluppo, test e dimostrazione, conferma del r
 Prova locale su Mac M4 24 GB con la registrazione completa di Farmacologia: preset bilanciato, circa 6,43 secondi fra creazione e completamento del lavoro; output 53.900.252 byte. È una singola misura, non un benchmark generalizzabile. SHA-256 dell'originale invariato.
 
 Nel browser: avvio del lavoro con avanzamento, recupero della versione dopo ricaricamento e passaggio da originale a migliorato con posizione 8,435231 secondi mantenuta e pausa preservata. Durata del derivato nel lettore: 4491,56 secondi. Nessun errore del lettore osservato. Queste prove non qualificano la qualità percettiva dei preset o l'efficacia sul rumore.
+
+## Versione 0.5
+
+53 test automatici superati localmente: aggiunti catalogo e integrità dei modelli, ripresa dei download, revisioni della trascrizione e conflitti, proposte con riferimenti, protezione delle modifiche manuali, immagini e mappe dei capitoli, backup/ripristino e accesso monouso del launcher.
+
+Prove reali su Mac M4 24 GB:
+
+- Trascrizione completa della registrazione di 4491,56 secondi con Whisper Turbo Q8: 588,68 secondi fra creazione e completamento del lavoro, 1697 segmenti. Nessun riferimento manuale disponibile per misurare WER/CER.
+- Proposta sull'intera trascrizione con Qwen3 4B Q4_K_M: 371,94 secondi, 30 sezioni e 127 riferimenti, lasciata non approvata.
+- Nel campione d'aula sono presenti errori importanti del riconoscimento, propagati nella sintesi. Qualità didattica non validata; i collegamenti strutturali non certificano il sostegno semantico delle affermazioni.
+- Il confronto iniziale Small/Turbo non è controllato: è cambiata anche la normalizzazione. Non permette di attribuire tutto il miglioramento al modello.
+- Nel browser verificati accettazione e modifica di una proposta di prova, stato protetto delle sezioni, consultazione di una revisione storica, navigazione dalle citazioni all'audio, inserimento immagini, mappa dei capitoli ed esportazione ZIP con immagini.
+- Pacchetto .app eseguito in un archivio di prova separato, con i pesi già scaricati: avvio, risorse web, runtime inclusi, importazione, FFmpeg, trascrizione Whisper, proposta Qwen e arresto completati. La prova non usa il Python del progetto per eseguire il servizio incluso nel bundle. La firma è ad hoc; nessuna notarizzazione o verifica su un secondo Mac.
+
+Build Docker non eseguito: Docker non è disponibile nell'ambiente corrente. CI GitHub non attiva per il permesso workflow mancante.
