@@ -16,9 +16,9 @@ Il nome è provvisorio. L'applicazione è in sviluppo e la qualità dei modelli 
 | Riduzione rumore IA e controllo volume con tre intensità | GTCRN locale su CPU; alternativa tradizionale FFmpeg |
 | Confronto originale/migliorato allo stesso punto | Implementato |
 | Trascrizione locale italiana con timestamp | Whisper Large v3 Turbo Q8 |
-| Correzioni della trascrizione in revisioni separate | Implementato |
+| Correzioni, ricerca e revisione dei passaggi all’ascolto | Revisioni separate, filtro dei passaggi da rivedere, riascolto e ripetizione |
 | Proposte di dispensa con riferimenti alle fonti | Qwen3 4B Q4_K_M, sperimentale |
-| Accettazione delle proposte e protezione delle sezioni modificate | Implementato |
+| Accettazione delle proposte e protezione delle sezioni modificate | Conferma di ogni nuova sezione; correzioni protette |
 | Immagini con didascalie e mappe dei capitoli | PNG, JPEG, WebP; mappe generate localmente |
 | Esportazione | Markdown, ZIP con immagini, stampa/PDF dal browser |
 | Backup e ripristino | ZIP verificato, ripristino in una nuova cartella |
@@ -33,9 +33,10 @@ Sono ancora da realizzare: isolamento avanzato del docente, registrazione live, 
 2. Controlla titolo, data e docente proposti. Le informazioni mancanti non vengono inventate.
 3. Apri la lezione: puoi ascoltare l'originale o creare una versione migliorata.
 4. Da **Modelli locali**, scarica i modelli necessari, con dimensioni e licenza visibili.
-5. Avvia la trascrizione; riascolta i timestamp e salva le correzioni.
-6. Apri **Dispensa** e prepara un aggiornamento. Controlla la proposta e i riferimenti prima di accettarla.
-7. Aggiungi immagini, modifica le sezioni e salva o esporta il materiale.
+5. Trascrivi con Whisper Turbo, inizialmente dall’originale normalizzato. La pulizia per il riascolto non cambia automaticamente questa scelta.
+6. Cerca i termini da controllare, riascolta o ripeti i passaggi e segnali come **Rivisto all’ascolto**. Salva per conservare correzioni e controlli in una nuova revisione.
+7. Apri **Dispensa** e prepara un aggiornamento. Controlla ciascuna nuova sezione e i riferimenti, quindi confermala prima di accettare la proposta.
+8. Aggiungi immagini, modifica le sezioni e salva o esporta il materiale.
 
 Il testo automatico può contenere errori. Sul primo campione d'aula Whisper Small ha prodotto errori marcati; Turbo ha migliorato alcuni termini, ma non ha eliminato tutte le inesattezze. Un riferimento valido indica la fonte, non certifica da solo che una sintesi sia corretta. Le proposte delle dispense vanno confrontate con audio e trascrizioni.
 
@@ -97,7 +98,9 @@ Importazione di MP3, WAV, M4A e FLAC fino a 512 MiB. Contenuto ed estensione dev
 
 La pulizia IA usa GTCRN tramite sherpa-onnx, localmente su CPU: converte a 16 kHz mono, riduce il rumore e miscela il risultato con l’originale secondo l’intensità scelta. FFmpeg resta necessario per conversione, controllo del volume e MP3 a 96 kbit/s per il riascolto. È disponibile anche il percorso tradizionale con filtri passa-alto e riduzione spettrale. Il percorso IA conserva un WAV senza ulteriore compressione per la trascrizione (circa 1,92 MB al minuto), oltre al MP3. Il modello va scaricato esplicitamente da **Modelli locali**. Possono occupare più spazio dell'originale senza recuperare dettagli che non erano presenti. I preset sono da qualificare all'ascolto; non isolano il docente dalle altre voci né garantiscono la rimozione del riverbero.
 
-Whisper permette di scegliere l’originale o la versione migliorata, con normalizzazione del volume e blocchi di dieci minuti. Per GTCRN usa il WAV intermedio, evitando la ricompressione MP3; la revisione registra la provenienza. La pulizia non è un requisito per trascrivere e non garantisce meno errori: il confronto controllato è descritto in [docs/asr-comparison.md](docs/asr-comparison.md). Titolo della materia, della lezione e descrizione forniscono un breve contesto al riconoscimento; i segmenti vengono separati ai confini delle parole. I timestamp sono riportati alla lezione completa; i confini dei blocchi possono influire sul riconoscimento. L'avanzamento si aggiorna al termine di ciascun blocco. Le correzioni salvano una nuova revisione, con controllo contro modifiche concorrenti. Una trascrizione corretta manualmente è protetta dalla ritrascrizione automatica.
+Whisper permette di scegliere l’originale o la versione migliorata, con normalizzazione del volume e blocchi di dieci minuti. Per GTCRN usa il WAV intermedio, evitando la ricompressione MP3; la revisione registra la provenienza. La pulizia non è un requisito per trascrivere e non garantisce meno errori: il confronto controllato è descritto in [docs/asr-comparison.md](docs/asr-comparison.md). Titolo della materia, della lezione e descrizione forniscono un breve contesto al riconoscimento; i segmenti vengono separati ai confini delle parole. I timestamp sono riportati alla lezione completa; i confini dei blocchi possono influire sul riconoscimento. L'avanzamento si aggiorna al termine di ciascun blocco. Il segno “Rivisto all’ascolto” è una dichiarazione dello studente, non una certificazione automatica. Modificare nuovamente il testo rimuove il segno; anche una correzione senza segno resta protetta. Le correzioni salvano una nuova revisione, con controllo contro modifiche concorrenti. Una trascrizione corretta manualmente è protetta dalla ritrascrizione automatica.
+
+Ogni nuova sezione della proposta richiede una conferma esplicita prima dell’accettazione, anche tramite API. L’endpoint `POST /api/v1/subjects/{subject_id}/notes/{revision_id}/accept` richiede il corpo JSON `{"reviewed_chapter_ids":["UUID della sezione"]}` con tutti e soli gli ID delle sezioni non manuali. Le sezioni manuali preservate non richiedono una nuova conferma.
 
 Le dispense sono proposte basate sulle revisioni delle trascrizioni, con riferimenti a lezione, revisione, segmento e tempo. Il modello genera sezioni da blocchi di testo; l'organizzazione tematica e la deduplicazione semantica richiedono ulteriore qualificazione. Le sezioni modificate manualmente vengono preservate. Fonti cambiate e proposte basate su versioni superate sono segnalate e, quando necessario, ne viene impedita l'accettazione. Le revisioni precedenti restano nel database; la cronologia delle trascrizioni è consultabile dall’interfaccia in sola lettura.
 

@@ -2,13 +2,14 @@
 let currentTranscript = null, transcriptDirty = false, studyTimer = null;
 let transcriptPage = 0, historicalTranscript = false, transcriptHead = null;
 const TRANSCRIPT_PAGE_SIZE = 40;
+let reviewCursor=null, previewRange=null, transcriptSaving=false;
 let activeStudyJob = null, activeView = 'library', notesTimer = null, modelsTimer = null;
 let currentNotes = null, editingChapter = null;
 function mayLeaveTranscript() { return !transcriptDirty || window.confirm('Ci sono correzioni non salvate. Vuoi abbandonarle?'); }
 const readableTime = seconds => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2,'0')}`;
 function resetStudy() {
-  clearTimeout(studyTimer); transcriptPage=0;historicalTranscript=false;transcriptHead=null;$('transcript-pagination').hidden=true;$('transcript-history').replaceChildren();$('transcript-history').disabled=true; currentTranscript = null; transcriptDirty = false; activeStudyJob = null;
-  $('transcript-segments').replaceChildren(); $('save-transcript').hidden = true;
+  clearTimeout(studyTimer); reviewCursor=null;previewRange=null;$('transcription-source').value='original';$('transcript-search').value='';$('only-unreviewed').checked=false;$('repeat-passage').checked=false; transcriptPage=0;historicalTranscript=false;transcriptHead=null;$('transcript-pagination').hidden=true;$('transcript-history').replaceChildren();$('transcript-history').disabled=true; currentTranscript = null; transcriptDirty = false; activeStudyJob = null;
+  $('transcript-segments').replaceChildren(); $('transcript-review-summary').textContent='';$('transcript-provenance').textContent='';$('next-unreviewed').disabled=true; $('save-transcript').hidden = true;
   $('study-progress').hidden = true; $('cancel-study').hidden = true;
   $('transcript-revision').textContent = ''; $('transcript-status').textContent = 'Trascrizione italiana con timestamp e correzioni manuali.';
   $('transcribe-lesson').disabled = false; $('transcribe-lesson').hidden = false; $('transcribe-lesson').textContent='Trascrivi sul dispositivo';
@@ -27,20 +28,41 @@ function seekTo(seconds) {
   if (player.readyState >= 1) player.currentTime=seconds;
   else player.addEventListener('loadedmetadata',()=>{player.currentTime=seconds;},{once:true});
 }
+function reviewedSegments(){return new Set(currentTranscript?.metadata.reviewed_segment_ids || []);}
+function visibleSegments(){
+  if(!currentTranscript)return [];
+  const query=$('transcript-search').value.trim().toLocaleLowerCase('it'),reviewed=reviewedSegments();
+  return currentTranscript.segments.filter(s=>(!$('only-unreviewed').checked || !reviewed.has(s.id)) && (!query || s.text.toLocaleLowerCase('it').includes(query)));
+}
+function renderReviewSummary(){
+  if(!currentTranscript){$('transcript-review-summary').textContent='';$('transcript-provenance').textContent='';return;}
+  const count=reviewedSegments().size,total=currentTranscript.segments.length;
+  $('transcript-review-summary').textContent=`${count} di ${total} passaggi rivisti all’ascolto${transcriptDirty?' · modifiche da salvare':''}`;
+  $('transcript-provenance').textContent=`Whisper Turbo · ${currentTranscript.metadata.source==='enhanced'?'audio migliorato':currentTranscript.metadata.source==='original'?'originale normalizzato':'origine non registrata'} · ${historicalTranscript?'revisione storica':currentTranscript.metadata.manual?'revisione manuale protetta':'testo automatico da controllare'}`;
+  $('next-unreviewed').disabled=historicalTranscript || count===total;
+}
+async function listenSegment(segment){
+  reviewCursor=segment.id;previewRange={start:segment.start,end:segment.end};seekTo(segment.start);
+  try{await $('player').play();}catch{notify('Premi Play per riascoltare il passaggio.',true);}
+}
 function renderTranscript() {
   $('transcript-segments').replaceChildren();
-  if (!currentTranscript) return;
+  renderReviewSummary();if (!currentTranscript) return;
   $('transcript-revision').textContent=(historicalTranscript?'Storica · ':'Revisione ')+currentTranscript.revision;
-  $('transcribe-lesson').hidden=false; $('transcribe-lesson').textContent=currentTranscript.metadata.manual?'Revisione corretta · protetta':'Ritrascrivi con il modello attuale'; $('save-transcript').hidden=historicalTranscript; $('save-transcript').disabled=!transcriptDirty;
-  const count=currentTranscript.segments.length; transcriptPage=Math.min(transcriptPage,Math.max(0,Math.ceil(count/TRANSCRIPT_PAGE_SIZE)-1));
+  $('transcribe-lesson').hidden=false; $('transcribe-lesson').textContent=currentTranscript.metadata.manual?'Revisione corretta · protetta':'Ritrascrivi con il modello attuale'; $('save-transcript').hidden=historicalTranscript; $('save-transcript').disabled=transcriptSaving || !transcriptDirty;
+  const filtered=visibleSegments(),count=filtered.length; transcriptPage=Math.min(transcriptPage,Math.max(0,Math.ceil(count/TRANSCRIPT_PAGE_SIZE)-1));
   $('transcript-pagination').hidden=count<=TRANSCRIPT_PAGE_SIZE; $('transcript-prev').disabled=transcriptPage===0; $('transcript-next').disabled=(transcriptPage+1)*TRANSCRIPT_PAGE_SIZE>=count;
-  $('transcript-page-info').textContent=`${transcriptPage*TRANSCRIPT_PAGE_SIZE+1}–${Math.min(count,(transcriptPage+1)*TRANSCRIPT_PAGE_SIZE)} di ${count}`;
-  for (const segment of currentTranscript.segments.slice(transcriptPage*TRANSCRIPT_PAGE_SIZE,(transcriptPage+1)*TRANSCRIPT_PAGE_SIZE)) {
+  $('transcript-page-info').textContent=`${count?transcriptPage*TRANSCRIPT_PAGE_SIZE+1:0}–${Math.min(count,(transcriptPage+1)*TRANSCRIPT_PAGE_SIZE)} di ${count}`;
+  if(!count){const empty=document.createElement('p');empty.className='small';empty.textContent='Nessun passaggio corrisponde ai filtri.';$('transcript-segments').append(empty);}
+  for (const segment of filtered.slice(transcriptPage*TRANSCRIPT_PAGE_SIZE,(transcriptPage+1)*TRANSCRIPT_PAGE_SIZE)) {
     const row=document.createElement('div');row.className='transcript-segment';row.dataset.start=segment.start;row.dataset.end=segment.end;
-    const time=document.createElement('button');time.type='button';time.textContent=readableTime(segment.start);time.setAttribute('aria-label',`Ascolta da ${readableTime(segment.start)}`);time.onclick=()=>seekTo(segment.start);
-    const text=document.createElement('textarea');text.value=segment.text;text.rows=2;text.readOnly=historicalTranscript;text.maxLength=20000;text.setAttribute('aria-label',`Testo a ${readableTime(segment.start)}`);
-    text.oninput=()=>{segment.text=text.value;transcriptDirty=true;$('save-transcript').disabled=false;};
-    row.append(time,text);$('transcript-segments').append(row);
+    const time=document.createElement('button');time.type='button';time.textContent=readableTime(segment.start);time.setAttribute('aria-label',`Ascolta da ${readableTime(segment.start)}`);time.onclick=()=>listenSegment(segment);
+    const text=document.createElement('textarea');text.value=segment.text;text.rows=2;text.readOnly=historicalTranscript || transcriptSaving;text.maxLength=20000;text.setAttribute('aria-label',`Testo a ${readableTime(segment.start)}`);
+    const review=document.createElement('label');review.className='passage-review';
+    const check=document.createElement('input');check.type='checkbox';check.checked=reviewedSegments().has(segment.id);check.disabled=historicalTranscript || transcriptSaving;check.setAttribute('aria-label',`Rivisto all’ascolto a ${readableTime(segment.start)}`);review.append(check,document.createTextNode('Rivisto all’ascolto'));
+    check.onchange=()=>{const ids=reviewedSegments();check.checked?ids.add(segment.id):ids.delete(segment.id);currentTranscript.metadata.reviewed_segment_ids=[...ids];transcriptDirty=true;$('transcribe-lesson').disabled=true;$('save-transcript').disabled=false;renderReviewSummary();if($('only-unreviewed').checked)renderTranscript();};
+    text.oninput=()=>{segment.text=text.value;const ids=reviewedSegments();ids.delete(segment.id);currentTranscript.metadata.reviewed_segment_ids=[...ids];check.checked=false;transcriptDirty=true;$('transcribe-lesson').disabled=true;$('save-transcript').disabled=false;renderReviewSummary();};
+    const body=document.createElement('div');body.append(text,review);row.append(time,body);$('transcript-segments').append(row);
   }
 }
 async function loadStudy() {
@@ -53,7 +75,7 @@ async function loadStudy() {
   for(const revision of revisions){const option=document.createElement('option');option.value=revision.id;option.textContent=`${revision.revision} · ${revision.metadata.manual?'correzioni manuali':revision.metadata.model || 'automatica'}`;option.selected=Boolean(currentTranscript && currentTranscript.id===revision.id);$('transcript-history').append(option);}
   if (transcript && !transcriptDirty && !historicalTranscript && (!currentTranscript || currentTranscript.id!==transcript.id)) {currentTranscript=transcript;renderTranscript();$('transcript-history').value=transcript.id;}
   activeStudyJob=jobs.find(job=>['queued','running','interrupted'].includes(job.status)) || null;
-  $('transcribe-lesson').disabled=Boolean(activeStudyJob || historicalTranscript || currentTranscript && currentTranscript.metadata.manual);
+  $('transcribe-lesson').disabled=Boolean(transcriptDirty || transcriptSaving || activeStudyJob || historicalTranscript || currentTranscript && currentTranscript.metadata.manual);
   $('cancel-study').hidden=!activeStudyJob; $('study-progress').hidden=!activeStudyJob;
   if (activeStudyJob) {
     $('study-progress').value=activeStudyJob.progress;
@@ -64,6 +86,7 @@ async function loadStudy() {
 }
 $('transcribe-lesson').onclick=async()=>{
   if (!currentLesson)return;
+  if(transcriptDirty){notify('Salva le correzioni prima di avviare un altro lavoro.',true);return;}
   $('transcribe-lesson').disabled=true;
   try {await request(`/api/v1/lessons/${currentLesson.id}/transcribe`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({language:'it',base_revision:currentTranscript?currentTranscript.id:null,audio_job_id:$('transcription-source').value==='enhanced' && currentAudioJob?currentAudioJob.id:null})});await loadStudy();}
   catch(e){notify(e.message,true);$('transcribe-lesson').disabled=false;}
@@ -72,15 +95,17 @@ $('cancel-study').onclick=async()=>{if(activeStudyJob)try{await request(`/api/v1
 $('save-transcript').onclick=async()=>{
   if(!currentTranscript || !currentLesson)return;
   const lessonId=currentLesson.id, base=currentTranscript.id;
-  $('save-transcript').disabled=true;
+  transcriptSaving=true;renderTranscript();
   try {
-    const result=await request(`/api/v1/lessons/${lessonId}/transcript`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({base_revision:base,segments:currentTranscript.segments.map(({id,text})=>({id,text}))})});
+    const result=await request(`/api/v1/lessons/${lessonId}/transcript`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({base_revision:base,reviewed_segment_ids:[...reviewedSegments()],segments:currentTranscript.segments.map(({id,text})=>({id,text}))})});
     if(currentLesson && currentLesson.id===lessonId){currentTranscript=result;transcriptDirty=false;renderTranscript();await loadStudy();}
     notify('Correzioni salvate in una nuova revisione. Le dispense già generate possono richiedere un aggiornamento.');
-  }catch(e){notify(e.message,true);$('save-transcript').disabled=false;}
+  }catch(e){notify(e.message,true);}
+  finally{transcriptSaving=false;if(currentLesson && currentLesson.id===lessonId)renderTranscript();}
 };
 $('player').addEventListener('timeupdate',()=>{
   const position=$('player').currentTime;
+  if(previewRange && position>=previewRange.end){if($('repeat-passage').checked)seekTo(previewRange.start);else{$('player').pause();previewRange=null;}}
   for(const row of document.querySelectorAll('.transcript-segment'))row.classList.toggle('active',Number(row.dataset.start)<=position && Number(row.dataset.end)>position);
 });
 async function loadModels(){
@@ -116,7 +141,7 @@ function renderChapter(chapter,editable){
   const text=document.createElement('p');text.className='chapter-text';text.textContent=chapter.text;
   const sources=document.createElement('div');sources.className='sources';
   for(const ref of chapter.sources){const link=document.createElement('button');link.className='source-link';link.textContent=`↗ ${readableTime(ref.start)} · fonte`;link.title=(lessons.find(l=>l.id===ref.lesson_id)||{}).title||'Lezione';link.onclick=()=>openSource(ref).catch(e=>notify(e.message,true));const printed=document.createElement('span');printed.className='print-citation';printed.textContent=`Fonte: ${(lessons.find(l=>l.id===ref.lesson_id)||{}).title||ref.lesson_id}, ${readableTime(ref.start)} · revisione ${ref.revision_id}`;sources.append(link,printed);}
-  card.append(heading,text,sources);return card;
+  card.append(heading,text,sources);if(chapter.reviewed_at || chapter.manual){const state=document.createElement('p');state.className='small';state.textContent=chapter.manual?'Sezione modificata manualmente · protetta':'Sezione controllata dallo studente';card.append(state);}return card;
 }
 async function loadNotes(){
   clearTimeout(notesTimer);if(!selected){$('notes-status').textContent='Crea o scegli una materia per iniziare.';return;}
@@ -130,8 +155,13 @@ async function loadNotes(){
   if(proposal && !active) $('notes-status').textContent='Proposta pronta: controlla le sezioni e i riferimenti prima di accettarla.';
   if(proposal){
     const box=document.createElement('section');box.className='proposal-card';const title=document.createElement('h3');title.textContent='Aggiornamento da verificare';const description=document.createElement('p');description.textContent=`${proposal.chapters.length} sezioni proposte. Controlla testo e riferimenti prima di sostituire la versione corrente.`;
-    const button=document.createElement('button');button.textContent=proposal.blocking_stale?'Fonti cambiate · rigenera':'Accetta aggiornamento';button.disabled=proposal.blocking_stale;button.onclick=async()=>{button.disabled=true;try{await request(`/api/v1/subjects/${id}/notes/${proposal.id}/accept`,{method:'POST'});await loadNotes();}catch(e){notify(e.message,true);button.disabled=false;}};
-    box.append(title,description,button);for(const chapter of proposal.chapters)box.append(renderChapter(chapter,false));$('notes-proposals').append(box);
+    const required=proposal.chapters.filter(c=>!c.manual),checked=new Set();
+    const button=document.createElement('button'),progress=document.createElement('p');progress.className='small';
+    const update=()=>{button.textContent=proposal.blocking_stale?'Fonti cambiate · rigenera':'Accetta sezioni controllate';button.disabled=proposal.blocking_stale || checked.size!==required.length;progress.textContent=`${checked.size} di ${required.length} nuove sezioni controllate. Confronta il testo con le fonti prima di confermare.`;};update();
+    button.onclick=async()=>{button.disabled=true;try{await request(`/api/v1/subjects/${id}/notes/${proposal.id}/accept`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reviewed_chapter_ids:[...checked]})});await loadNotes();}catch(e){notify(e.message,true);update();}};
+    box.append(title,description);
+    for(const chapter of proposal.chapters){const card=renderChapter(chapter,false);if(!chapter.manual){const label=document.createElement('label');label.className='chapter-review';const check=document.createElement('input');check.type='checkbox';check.setAttribute('aria-label',`Ho controllato la sezione ${chapter.title} e i riferimenti`);check.onchange=()=>{check.checked?checked.add(chapter.id):checked.delete(chapter.id);update();};label.append(check,document.createTextNode('Ho controllato questa sezione e i riferimenti'));card.append(label);}box.append(card);}
+    box.append(progress,button);$('notes-proposals').append(box);
   }
   if(currentNotes)for(const chapter of currentNotes.chapters)$('notes-content').append(renderChapter(chapter,true));
   $('export-notes').hidden=!currentNotes;$('export-notes').href=`/api/v1/subjects/${id}/notes/export`;$('export-notes').textContent='Esporta Markdown ↗';$('print-notes').hidden=!currentNotes;$('export-study').hidden=!currentNotes;$('export-study').href=`/api/v1/subjects/${id}/study-export`;
@@ -169,4 +199,15 @@ $('generate-outline').onclick=async()=>{
   if(!selected || !currentNotes)return;const id=selected,button=$('generate-outline');button.disabled=true;
   try{await request(`/api/v1/subjects/${id}/materials/outline`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({base_revision:currentNotes.id})});await loadMaterials(id);notify('Mappa dei capitoli creata e collegata alla revisione della dispensa.');}
   catch(e){notify(e.message,true);}finally{button.disabled=false;}
+};
+
+$('transcript-search').oninput=()=>{transcriptPage=0;renderTranscript();};
+$('only-unreviewed').onchange=()=>{transcriptPage=0;renderTranscript();};
+$('next-unreviewed').onclick=()=>{
+  if(!currentTranscript)return;
+  const all=currentTranscript.segments,reviewed=reviewedSegments(),cursor=all.findIndex(s=>s.id===reviewCursor);
+  const next=all.find((s,i)=>i>cursor && !reviewed.has(s.id)) || all.find(s=>!reviewed.has(s.id));
+  if(!next)return;previewRange=null;$('transcript-search').value='';reviewCursor=next.id;
+  const filtered=visibleSegments();transcriptPage=Math.floor(filtered.findIndex(s=>s.id===next.id)/TRANSCRIPT_PAGE_SIZE);renderTranscript();seekTo(next.start);
+  const field=document.querySelector(`.transcript-segment[data-start="${next.start}"] textarea`);if(field){field.focus();field.scrollIntoView({block:'nearest'});}
 };

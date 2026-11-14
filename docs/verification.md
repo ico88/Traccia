@@ -44,3 +44,19 @@ Nuovo pacchetto Mac 0.6 firmato ad hoc: eseguito con il Python incluso, GTCRN re
 Interfaccia: versione IA completata riconosciuta dopo riavvio; selezione Migliorato e sorgente migliorata per Whisper disponibili. La trascrizione completa precedente e le dispense non sono state sostituite durante questa verifica.
 
 Vedere [valutazione dei candidati](model-selection.md) per i modelli proposti: ricerca documentale distinta dai motori realmente integrati.
+
+## Versione 0.7 — revisione guidata
+
+Whisper Turbo resta il motore integrato; sorgente iniziale reimpostata all’originale normalizzato per ogni lezione. GTCRN resta il percorso IA del riascolto, con scelta esplicita del derivato per l’ASR. Nessuna promozione dei modelli sperimentali.
+
+Aggiunti segni di revisione per segmento, ricerca nel testo, filtro dei passaggi da rivedere, navigazione al prossimo passaggio, riascolto limitato al segmento e ripetizione. I segni sono dichiarazioni manuali salvate nelle revisioni, non misure dell’accuratezza. Un’ulteriore modifica del testo richiede di rivederlo nuovamente. Le revisioni storiche restano in sola lettura.
+
+L’accettazione delle dispense richiede gli ID di ogni nuova sezione controllata; richieste vuote, parziali o con ID estranei sono rifiutate. Le sezioni modificate manualmente vengono preservate. Nessuna approvazione o modifica automatica delle dispense reali durante i test.
+
+Prova browser su archivio dimostrativo separato con segnale audio sintetico: conferma parziale e completa delle due sezioni, accettazione, salvataggio di un passaggio rivisto e protezione della revisione, ricerca/filtro e avvio del riascolto. Non costituisce una prova di qualità della trascrizione o delle dispense.
+
+68 test superati, incluse versioni dei segni di revisione, invalidazione dopo modifica, ID non validi e rifiuto dell’accettazione parziale delle dispense. Verificato nel browser anche l’arresto del riascolto al termine del passaggio e la rimozione del segno dopo modifica.
+
+Pacchetto Mac 0.7 eseguito nell’archivio di prova separato: avvio, runtime inclusi, GTCRN reale, Whisper dal WAV neurale, proposta Qwen e arresto regolare. Build ad hoc non notarizzata; nessun peso o archivio personale incluso, nessuna prova su un secondo Mac.
+
+Verificata anche la ripetizione del passaggio nel browser. L’anteprima sull’archivio reale è stata riavviata con il backend 0.7; una richiesta di controllo su ID inesistenti conferma la nuova validazione senza coinvolgere proposte reali.

@@ -42,6 +42,12 @@ class SegmentEdit(BaseModel):
 class TranscriptEdit(BaseModel):
     base_revision: UUID
     segments: list[SegmentEdit]=Field(max_length=10000)
+    reviewed_segment_ids: list[str] | None = Field(default=None,max_length=10000)
+
+
+class NoteAcceptance(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    reviewed_chapter_ids: list[UUID]=Field(max_length=10000)
 
 
 class NoteEdit(BaseModel):
@@ -350,8 +356,13 @@ def study_router(engine,authenticate):
             updates={s.id:s.text.strip() for s in edit.segments}
             if set(updates)!={s['id'] for s in current['segments']}:raise HTTPException(422,'Segment set cannot change')
             segments=[{**s,'text':updates[s['id']]} for s in current['segments']]
+            old_reviewed=set(current['metadata'].get('reviewed_segment_ids',[]))
+            reviewed=set(edit.reviewed_segment_ids) if edit.reviewed_segment_ids is not None else {s['id'] for s in current['segments'] if s['id'] in old_reviewed and s['text']==updates[s['id']]}
+            if not reviewed.issubset(updates) or (edit.reviewed_segment_ids is not None and len(reviewed)!=len(edit.reviewed_segment_ids)):
+                raise HTTPException(422,'Gli identificativi dei passaggi rivisti non sono validi.')
             identifier=str(uuid4())
-            c.execute('INSERT INTO transcripts VALUES (?,?,?,?,?,?)',(identifier,str(lesson_id),current['revision']+1,json.dumps(segments),json.dumps({**current['metadata'],'manual':True}),timestamp()))
+            metadata={**current['metadata'],'manual':True,'reviewed_segment_ids':[s['id'] for s in segments if s['id'] in reviewed],'reviewed_at':timestamp()}
+            c.execute('INSERT INTO transcripts VALUES (?,?,?,?,?,?)',(identifier,str(lesson_id),current['revision']+1,json.dumps(segments),json.dumps(metadata),timestamp()))
             return latest_transcript(c,lesson_id)
 
     @router.get('/lessons/{lesson_id}/study-jobs')
@@ -399,7 +410,7 @@ def study_router(engine,authenticate):
         return {'current':current,'proposals':proposals,'jobs':jobs}
 
     @router.post('/subjects/{subject_id}/notes/{revision_id}/accept')
-    def accept(subject_id:UUID,revision_id:UUID):
+    def accept(subject_id:UUID,revision_id:UUID,review:NoteAcceptance):
         with closing(connect()) as c,c:
             c.execute('BEGIN IMMEDIATE')
             row=c.execute('SELECT * FROM notes WHERE id=? AND subject_id=?',(str(revision_id),str(subject_id))).fetchone()
@@ -413,7 +424,13 @@ def study_router(engine,authenticate):
                 for ref in chapter['sources']:
                     latest=latest_transcript(c,ref['lesson_id'])
                     if not latest or latest['id']!=ref['revision_id']:raise HTTPException(409,'Le fonti sono cambiate. Genera una nuova proposta.')
-            c.execute('UPDATE notes SET accepted=1 WHERE id=?',(str(revision_id),))
+            required={chapter['id'] for chapter in proposal['chapters'] if not chapter.get('manual')}
+            checked={str(identifier) for identifier in review.reviewed_chapter_ids}
+            if checked!=required or len(checked)!=len(review.reviewed_chapter_ids):
+                raise HTTPException(422,'Controlla ogni nuova sezione e i suoi riferimenti prima di accettare la proposta.')
+            for chapter in proposal['chapters']:
+                if chapter['id'] in checked:chapter['reviewed_at']=timestamp()
+            c.execute('UPDATE notes SET accepted=1,chapters=? WHERE id=?',(json.dumps(proposal['chapters']),str(revision_id)))
             return {**proposal,'accepted':True}
 
     @router.put('/subjects/{subject_id}/notes')

@@ -76,7 +76,7 @@ def test_notes_proposal_accept_edit_incremental_and_export(tmp_path,monkeypatch)
         assert data['current'] is None
         proposal=data['proposals'][0]
         assert proposal['chapters'][0]['sources'][0]['segment_id']==segment['id']
-        accepted=client.post(route+'/'+proposal['id']+'/accept',headers=AUTH)
+        accepted=client.post(route+'/'+proposal['id']+'/accept',headers=AUTH,json={'reviewed_chapter_ids':[c['id'] for c in proposal['chapters'] if not c.get('manual')]})
         assert accepted.status_code==200
         chapter=proposal['chapters'][0]
         edited=client.put(route,headers=AUTH,json={'base_revision':proposal['id'],'chapter_id':chapter['id'],'title':'Il mio titolo','text':'La mia correzione'})
@@ -87,7 +87,7 @@ def test_notes_proposal_accept_edit_incremental_and_export(tmp_path,monkeypatch)
         assert wait(client,job['id'])['status']=='completed'
         proposal=client.get(route,headers=AUTH).json()['proposals'][0]
         assert any(c['text']=='La mia correzione' for c in proposal['chapters'])
-        assert client.post(route+'/'+proposal['id']+'/accept',headers=AUTH).status_code==200
+        assert client.post(route+'/'+proposal['id']+'/accept',headers=AUTH,json={'reviewed_chapter_ids':[c['id'] for c in proposal['chapters'] if not c.get('manual')]}).status_code==200
         exported=client.get(route+'/export',headers=AUTH)
         assert 'La mia correzione' in exported.text
         assert segment['id'] in exported.text
@@ -102,7 +102,7 @@ def test_stale_sources_block_acceptance(tmp_path,monkeypatch):
         proposal=client.get(route,headers=AUTH).json()['proposals'][0]
         client.put(f'/api/v1/lessons/{lid}/transcript',headers=AUTH,json={'base_revision':rid,'segments':[{'id':segment['id'],'text':'Fonte aggiornata'}]})
         assert client.get(route,headers=AUTH).json()['proposals'][0]['blocking_stale']
-        assert client.post(route+'/'+proposal['id']+'/accept',headers=AUTH).status_code==409
+        assert client.post(route+'/'+proposal['id']+'/accept',headers=AUTH,json={'reviewed_chapter_ids':[c['id'] for c in proposal['chapters'] if not c.get('manual')]}).status_code==409
 
 
 def test_invalid_model_citations_not_saved(tmp_path,monkeypatch):

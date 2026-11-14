@@ -39,8 +39,8 @@ def main():
             stage=Path(temporary)
             shutil.copytree(bundle,stage/'AulaLocale.app',symlinks=True)
             (stage/'Applicazioni').symlink_to('/Applications')
-            (stage/'LEGGIMI.txt').write_text('AulaLocale 0.6 - build di sviluppo Apple Silicon.\nTrascina AulaLocale in Applicazioni e avviala. I modelli si scaricano dalla schermata Modelli locali.\nBuild ad hoc non notarizzata, destinata ai test locali. Nessuna registrazione inclusa.\nSorgenti: https://github.com/ico88/aulalocale/tree/sviluppo\n')
-            subprocess.run(['hdiutil','create','-ov','-volname','AulaLocale','-srcfolder',str(stage),'-format','UDZO',str(output/'AulaLocale-0.6-AppleSilicon-sviluppo.dmg')],check=True)
+            (stage/'LEGGIMI.txt').write_text('AulaLocale 0.7 - build di sviluppo Apple Silicon.\nTrascina AulaLocale in Applicazioni e avviala. I modelli si scaricano dalla schermata Modelli locali.\nBuild ad hoc non notarizzata, destinata ai test locali. Nessuna registrazione inclusa.\nSorgenti: https://github.com/ico88/aulalocale/tree/sviluppo\n')
+            subprocess.run(['hdiutil','create','-ov','-volname','AulaLocale','-srcfolder',str(stage),'-format','UDZO',str(output/'AulaLocale-0.7-AppleSilicon-sviluppo.dmg')],check=True)
     if (output/'AulaLocale').is_dir():shutil.rmtree(output/'AulaLocale')
     print('Development .app built. Distribution signing and notarization are not included.')
 
