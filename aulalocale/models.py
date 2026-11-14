@@ -21,6 +21,12 @@ CATALOG = {
         'repo':'Qwen/Qwen3-4B-GGUF', 'revision':'bc640142c66e1fdd12af0bd68f40445458f3869b',
         'file':'Qwen3-4B-Q4_K_M.gguf', 'bytes':2497280256,
         'sha256':'7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5', 'license':'Apache-2.0'},
+    'gtcrn': {'name':'GTCRN · pulizia voce IA', 'task':'enhancement',
+        'repo':'Xiaobin-Rong/gtcrn', 'revision':'sherpa-speech-enhancement-models-e77603ac',
+        'url':'https://github.com/k2-fsa/sherpa-onnx/releases/download/speech-enhancement-models/gtcrn_simple.onnx',
+        'file':'gtcrn_simple.onnx','bytes':535638,
+        'sha256':'e77603ac0c23dac3227dd2d7135b3a585cbee2679048aecfa886657d3ae1b534','license':'MIT'},
+
 }
 
 
@@ -93,7 +99,7 @@ class ModelManager:
             if shutil.disk_usage(self.directory).free < model['bytes']-offset+100*1024*1024:
                 raise ValueError('Spazio insufficiente per il modello')
             if offset < model['bytes']:
-                url=f"https://huggingface.co/{model['repo']}/resolve/{model['revision']}/{model['file']}"
+                url=model.get('url') or f"https://huggingface.co/{model['repo']}/resolve/{model['revision']}/{model['file']}"
                 headers={'Range':f'bytes={offset}-'} if offset else {}
                 with urlopen(Request(url,headers=headers),context=ssl.create_default_context(cafile=certifi.where()),timeout=20) as response:
                     if response.status != 206: offset=0
@@ -127,7 +133,7 @@ def models_router(manager,authenticate):
     router=APIRouter(prefix='/api/v1',dependencies=[Depends(authenticate)])
     @router.get('/models')
     def models():
-        return {'models':manager.status(),'runtimes':{'transcription':bool(runtime_path('whisper-cli')),'notes':bool(runtime_path('llama-cli'))}}
+        return {'models':manager.status(),'runtimes':{'transcription':bool(runtime_path('whisper-cli')),'notes':bool(runtime_path('llama-cli')),'enhancement':True}}
     @router.post('/models/{identifier}/download',status_code=202)
     def download(identifier:str):
         manager.start(identifier)

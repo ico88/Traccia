@@ -7,3 +7,6 @@ mutagen==1.48.1
 imageio-ffmpeg==0.8.1
 certifi==2026.10.23
 Pillow==13.0.0
+numpy==2.4.6
+sherpa-onnx==2.0.1
+sherpa-onnx-core==2.0.1

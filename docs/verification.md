@@ -32,3 +32,15 @@ Prove reali su Mac M4 24 GB:
 - Pacchetto .app eseguito in un archivio di prova separato, con i pesi già scaricati: avvio, risorse web, runtime inclusi, importazione, FFmpeg, trascrizione Whisper, proposta Qwen e arresto completati. La prova non usa il Python del progetto per eseguire il servizio incluso nel bundle. La firma è ad hoc; nessuna notarizzazione o verifica su un secondo Mac.
 
 Build Docker non eseguito: Docker non è disponibile nell'ambiente corrente. CI GitHub non attiva per il permesso workflow mancante.
+
+## Versione 0.6 — primo denoising IA
+
+58 test superati, comprese due prove effettive con il peso GTCRN locale fornito esplicitamente (senza variabile ambiente queste due prove vengono saltate). Verificati durata PCM invariata, originale invariato, creazione e riuso del derivato, backup con WAV e selezione della sorgente per la trascrizione. I test normali restano privi di download dei pesi.
+
+Prova sulla registrazione completa di Farmacologia: GTCRN bilanciato, 180,70 secondi tra creazione e completamento del lavoro; WAV 16 kHz mono di 4491,56 secondi / 71.864.960 campioni, 143.729.964 byte. SHA-256 dell'originale invariato. È una singola esecuzione su M4 24 GB, non un benchmark del server né una misura della qualità percettiva. Generati estratti privati originali/tradizionali/IA per l'ascolto; nessun WER/CER o giudizio di superiorità dichiarato.
+
+Nuovo pacchetto Mac 0.6 firmato ad hoc: eseguito con il Python incluso, GTCRN reale in processo figlio, trascrizione Whisper dal WAV neurale, proposta Qwen e arresto regolare. I pesi già scaricati sono stati collegati solo all'archivio di prova, non inclusi nel pacchetto. Nessun test su un secondo Mac pulito o server i7.
+
+Interfaccia: versione IA completata riconosciuta dopo riavvio; selezione Migliorato e sorgente migliorata per Whisper disponibili. La trascrizione completa precedente e le dispense non sono state sostituite durante questa verifica.
+
+Vedere [valutazione dei candidati](model-selection.md) per i modelli proposti: ricerca documentale distinta dai motori realmente integrati.

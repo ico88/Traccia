@@ -118,7 +118,7 @@ def test_models_download_is_explicit(tmp_path):
     with TestClient(create_app(tmp_path,TOKEN)) as client:
         assert client.get('/api/v1/models').status_code==401
         result=client.get('/api/v1/models',headers=AUTH).json()
-        assert len(result['models'])==2
+        assert len(result['models'])==3
         assert all(m['status']=='not_installed' for m in result['models'])
         assert not (tmp_path/'models').exists()
         assert client.post('/api/v1/models/unknown/download',headers=AUTH).status_code==404
@@ -153,3 +153,29 @@ def test_retranscribe_adds_revision_without_erasing_previous(tmp_path,monkeypatc
         old=client.get(f'/api/v1/transcripts/{rid}',headers=AUTH).json()
         assert old['segments'][0]['text']==segment['text']
         assert len(client.get(f'/api/v1/lessons/{lid}/transcript/revisions',headers=AUTH).json())==2
+
+
+def test_transcription_uses_lossless_enhanced_source(tmp_path,monkeypatch):
+    sid,lid,rid,segment=seeded(tmp_path)
+    aid=str(uuid4());directory=tmp_path/'enhanced';directory.mkdir(exist_ok=True)
+    with wave.open(str(directory/(aid+'.wav')),'wb') as audio:
+        audio.setnchannels(1);audio.setsampwidth(2);audio.setframerate(16000);audio.writeframes(b'\0\0'*16000)
+    (directory/(aid+'.mp3')).write_bytes(b'invalid mp3: WAV must be preferred')
+    with sqlite3.connect(tmp_path/'aulalocale.sqlite3') as c:
+        c.execute('INSERT INTO audio_jobs VALUES (?,?,?, ?,100,NULL,?,?,?,?)',(aid,lid,'gtcrn-balanced','completed','2026-01-01','2026-01-01','GTCRN','gtcrn-recipe'))
+    monkeypatch.setattr(ModelManager,'require',lambda self,key:tmp_path/'model')
+    monkeypatch.setattr(study,'runtime_path',lambda name:sys.executable)
+    process=StudyEngine.process
+    def controlled(self,command,identifier):
+        if '-oj' in command:
+            output=Path(command[command.index('-of')+1]).with_suffix('.json')
+            output.write_text(json.dumps({'transcription':[{'text':'Da audio IA','offsets':{'from':0,'to':1000}}]}))
+        else:process(self,command,identifier)
+    monkeypatch.setattr(StudyEngine,'process',controlled)
+    with TestClient(create_app(tmp_path,TOKEN)) as client:
+        response=client.post(f'/api/v1/lessons/{lid}/transcribe',headers=AUTH,json={'base_revision':rid,'audio_job_id':aid})
+        assert response.status_code==202,response.text
+        assert wait(client,response.json()['id'])['status']=='completed'
+        metadata=client.get(f'/api/v1/lessons/{lid}/transcript',headers=AUTH).json()['metadata']
+        assert metadata['source']=='enhanced' and metadata['audio_job_id']==aid
+        assert metadata['source_recipe']=='gtcrn-recipe'

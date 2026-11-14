@@ -1,4 +1,4 @@
-# Architettura 0.5
+# Architettura 0.6
 
 ## Applicazione
 
@@ -29,3 +29,7 @@ API bearer o cookie HttpOnly/SameSite Strict. Verifica di origine per richieste 
 Il launcher desktop genera token e codice di apertura monouso, ascolta solo sul loopback e passa al browser il codice nel frammento URL. L'interfaccia lo rimuove prima di creare la sessione. Il codice non viene scritto nei log HTTP e non è riutilizzabile. Chiudi app arresta il servizio dopo la risposta.
 
 La modalità server è ancora singolo utente. Il Compose si lega al loopback; reverse proxy, HTTPS e isolamento fra utenti devono essere progettati e verificati prima di una pubblicazione remota.
+
+## Pulizia IA
+
+GTCRN esegue il denoising in un processo figlio locale sherpa-onnx su CPU. La coda seriale esistente gestisce avanzamento, annullamento e recupero. FFmpeg decodifica il file in PCM 16 kHz mono e prepara il derivato MP3 per il lettore; un WAV neurale mantiene la sorgente senza ricompressione per Whisper. Gli originali restano immutabili. La ricetta include hash dei pesi, intensità e postfiltri; il riuso distingue modello e preset. Il backup include entrambi i derivati completati. Lo schema resta alla versione 5: usare questa versione o successive per archivi con lavori GTCRN, evitando il downgrade dell’app.

@@ -24,3 +24,5 @@ outputs/
 
 runtimes/
 *.part
+
+*.onnx

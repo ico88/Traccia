@@ -151,7 +151,9 @@ def materials_router(root,connect,authenticate,worker):
                     with closing(connect()) as source,closing(sqlite3.connect(snapshot)) as target:source.backup(target)
                     with closing(sqlite3.connect(snapshot)) as c:
                         names=['originals/'+r[0] for r in c.execute('SELECT storage_name FROM lessons')]
-                        names+=['enhanced/'+r[0]+'.mp3' for r in c.execute("SELECT id FROM audio_jobs WHERE status='completed'")]
+                        jobs=[r[0] for r in c.execute("SELECT id FROM audio_jobs WHERE status='completed'")]
+                        names+=['enhanced/'+identifier+'.mp3' for identifier in jobs]
+                        names+=['enhanced/'+identifier+'.wav' for identifier in jobs if (root/'enhanced'/(identifier+'.wav')).is_file()]
                         names+=['materials/'+r[0] for r in c.execute('SELECT filename FROM materials')]
                     entries={'aulalocale.sqlite3':snapshot,**{name:root/name for name in names}}
                     manifest={'schema':5,'files':{}}

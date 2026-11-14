@@ -31,6 +31,7 @@ class StudyInput(BaseModel):
     model_config=ConfigDict(extra='forbid')
     language: Literal['it','en','auto']='it'
     base_revision: UUID | None = None
+    audio_job_id: UUID | None = None
 
 
 class SegmentEdit(BaseModel):
@@ -177,6 +178,14 @@ class StudyEngine:
         if existing and existing['metadata'].get('manual'):
             raise ValueError('La revisione contiene correzioni manuali e resta protetta.')
         source=self.root/'originals'/lesson['storage_name']
+        source_recipe=None
+        if options.get('audio_job_id'):
+            with closing(self.connect()) as c:
+                enhanced=c.execute("SELECT * FROM audio_jobs WHERE id=? AND lesson_id=? AND status='completed'",(options['audio_job_id'],job['lesson_id'])).fetchone()
+            if not enhanced:raise ValueError('La versione audio selezionata non è disponibile.')
+            lossless=self.root/'enhanced'/(enhanced['id']+'.wav')
+            source=lossless if lossless.is_file() else self.root/'enhanced'/(enhanced['id']+'.mp3')
+            source_recipe=enhanced['filter']
         if not source.is_file():raise ValueError('Audio originale non disponibile.')
         model=self.models.require('whisper-turbo');binary=runtime_path('whisper-cli')
         if not binary:raise ValueError('Runtime Whisper non installato.')
@@ -199,7 +208,7 @@ class StudyEngine:
         if not segments:raise ValueError('Nessun parlato riconosciuto. Controlla il contenuto audio.')
         metadata={'engine':'whisper.cpp','runtime':subprocess.run([binary,'--version'],capture_output=True,text=True,timeout=10).stdout.strip(),
                   'model':'whisper-turbo','sha256':self.models.status()[0]['sha256'],'language':options['language'],
-                  'source':'original','chunk_seconds':chunk_seconds,'manual':False,'context':context}
+                  'source':'enhanced' if options.get('audio_job_id') else 'original','audio_job_id':options.get('audio_job_id'),'source_recipe':source_recipe,'chunk_seconds':chunk_seconds,'manual':False,'context':context}
         with self.worker.lock:
             if self.cancelled(job['id']):raise InterruptedError()
             with closing(self.connect()) as c,c:
@@ -301,6 +310,12 @@ def study_router(engine,authenticate):
             if current and (current['metadata'].get('manual') or current['id']!=str(options.base_revision)):
                 raise HTTPException(409,'La trascrizione contiene correzioni manuali o la revisione è cambiata: nessun contenuto viene sovrascritto.')
             if not current and options.base_revision:raise HTTPException(409,'Revisione sorgente non disponibile')
+        if options.audio_job_id:
+            with closing(connect()) as c:
+                audio=c.execute("SELECT * FROM audio_jobs WHERE id=? AND lesson_id=? AND status='completed'",(str(options.audio_job_id),str(lesson_id))).fetchone()
+            if not audio:raise HTTPException(409,'Scegli una versione audio completata di questa lezione.')
+            if not any((engine.root/'enhanced'/(audio['id']+suffix)).is_file() for suffix in ['.wav','.mp3']):
+                raise HTTPException(409,'Il file audio selezionato non è disponibile.')
         engine.models.require('whisper-turbo')
         if not runtime_path('whisper-cli'):raise HTTPException(409,'Runtime Whisper non installato')
         return enqueue('transcription',lesson['subject_id'],str(lesson_id),options.model_dump(mode='json'))

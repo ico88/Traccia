@@ -19,9 +19,9 @@ def main():
     command=[sys.executable,'-m','PyInstaller','--noconfirm','--windowed','--onedir','--name','AulaLocale',
              '--osx-bundle-identifier','it.aulalocale.desktop','--distpath',str(output),'--workpath',str(ROOT/'work'/'pyinstaller'),
              '--specpath',str(ROOT/'work'),'--paths',str(ROOT),
-             '--exclude-module','numpy','--collect-all','imageio_ffmpeg','--collect-all','mutagen','--collect-all','uvicorn',
+             '--collect-all','imageio_ffmpeg','--collect-all','mutagen','--collect-all','sherpa_onnx','--collect-all','uvicorn',
              '--add-data',f'{ROOT / "aulalocale" / "web"}:aulalocale/web']
-    for dependency in ['mutagen','imageio-ffmpeg','Pillow','fastapi','uvicorn','starlette','pydantic','certifi']:
+    for dependency in ['mutagen','imageio-ffmpeg','Pillow','fastapi','uvicorn','starlette','pydantic','certifi','numpy','sherpa-onnx','sherpa-onnx-core']:
         command+=['--copy-metadata',dependency]
     if (ROOT/'runtimes'/'licenses').is_dir():command+=['--add-data',f'{ROOT / "runtimes" / "licenses"}:runtimes/licenses']
     for binary in binaries:command+=['--add-binary',f'{binary}:runtimes']
@@ -39,8 +39,8 @@ def main():
             stage=Path(temporary)
             shutil.copytree(bundle,stage/'AulaLocale.app',symlinks=True)
             (stage/'Applicazioni').symlink_to('/Applications')
-            (stage/'LEGGIMI.txt').write_text('AulaLocale 0.5 - build di sviluppo Apple Silicon.\nTrascina AulaLocale in Applicazioni e avviala. I modelli si scaricano dalla schermata Modelli locali.\nBuild ad hoc non notarizzata, destinata ai test locali. Nessuna registrazione inclusa.\nSorgenti: https://github.com/ico88/aulalocale/tree/sviluppo\n')
-            subprocess.run(['hdiutil','create','-ov','-volname','AulaLocale','-srcfolder',str(stage),'-format','UDZO',str(output/'AulaLocale-0.5-AppleSilicon-sviluppo.dmg')],check=True)
+            (stage/'LEGGIMI.txt').write_text('AulaLocale 0.6 - build di sviluppo Apple Silicon.\nTrascina AulaLocale in Applicazioni e avviala. I modelli si scaricano dalla schermata Modelli locali.\nBuild ad hoc non notarizzata, destinata ai test locali. Nessuna registrazione inclusa.\nSorgenti: https://github.com/ico88/aulalocale/tree/sviluppo\n')
+            subprocess.run(['hdiutil','create','-ov','-volname','AulaLocale','-srcfolder',str(stage),'-format','UDZO',str(output/'AulaLocale-0.6-AppleSilicon-sviluppo.dmg')],check=True)
     if (output/'AulaLocale').is_dir():shutil.rmtree(output/'AulaLocale')
     print('Development .app built. Distribution signing and notarization are not included.')
 

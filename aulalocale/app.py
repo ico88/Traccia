@@ -49,6 +49,7 @@ def create_app(data_dir: Path | None = None, token: str | None = None, bootstrap
 
     worker = AudioWorker(root, connect)
     models = ModelManager(root)
+    worker.models = models
     study = StudyEngine(root, connect, worker, models)
     worker.study = study
 
@@ -72,7 +73,7 @@ def create_app(data_dir: Path | None = None, token: str | None = None, bootstrap
             worker.stop()
             models.close()
 
-    api = FastAPI(title="AulaLocale", version="0.5.0", lifespan=lifespan,
+    api = FastAPI(title="AulaLocale", version="0.6.0", lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
     bearer = HTTPBearer(auto_error=False)
 

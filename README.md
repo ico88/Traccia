@@ -2,7 +2,7 @@
 
 **Le lezioni, al loro posto.** Archivio, audio migliorato, trascrizioni e dispense per materia, con elaborazione sul proprio computer.
 
-AulaLocale è un software sperimentale per studenti universitari. I file restano sul Mac o sul server su cui viene installato. I modelli si scaricano gratuitamente da Hugging Face e vengono eseguiti localmente: **nessuna API di inferenza cloud, nessun token Hugging Face nel percorso standard**.
+AulaLocale è un software sperimentale per studenti universitari. I file restano sul Mac o sul server su cui viene installato. I modelli si scaricano gratuitamente da Hugging Face o dalle release ufficiali dei progetti e vengono eseguiti localmente: **nessuna API di inferenza cloud, nessun token Hugging Face nel percorso standard**.
 
 Il nome è provvisorio. L'applicazione è in sviluppo e la qualità dei modelli va ancora qualificata su registrazioni universitarie rappresentative.
 
@@ -13,7 +13,7 @@ Il nome è provvisorio. L'applicazione è in sviluppo e la qualità dei modelli 
 | Materie, lezioni, ricerca e importazione drag and drop | Implementato |
 | Proposte di titolo, docente e data da nome e tag audio | Implementato, sempre modificabile |
 | Conservazione degli originali, lettore e velocità regolabile | Implementato |
-| Riduzione rumore e controllo volume con tre preset | Filtri tradizionali FFmpeg |
+| Riduzione rumore IA e controllo volume con tre intensità | GTCRN locale su CPU; alternativa tradizionale FFmpeg |
 | Confronto originale/migliorato allo stesso punto | Implementato |
 | Trascrizione locale italiana con timestamp | Whisper Large v3 Turbo Q8 |
 | Correzioni della trascrizione in revisioni separate | Implementato |
@@ -25,7 +25,7 @@ Il nome è provvisorio. L'applicazione è in sviluppo e la qualità dei modelli 
 | App Mac | Pacchetto di sviluppo generabile, non notarizzato |
 | Server Linux | Docker Compose predisposto; build container ancora da verificare |
 
-Sono ancora da realizzare: riduzione rumore tramite modelli IA, isolamento avanzato del docente, registrazione live, diarizzazione, estrazione automatica delle figure dalle slide, illustrazioni generative, account multiutente e distribuzione Mac firmata/notarizzata.
+Sono ancora da realizzare: isolamento avanzato del docente, registrazione live, diarizzazione, estrazione automatica delle figure dalle slide, illustrazioni generative, account multiutente e distribuzione Mac firmata/notarizzata.
 
 ## Un percorso semplice
 
@@ -84,6 +84,7 @@ Avviare un solo processo per archivio: **non usare `--workers`**. Un lock rifiut
 | Modello | Download | Licenza dichiarata upstream | Impiego |
 |---|---:|---|---|
 | [Whisper Large v3 Turbo Q8](https://huggingface.co/ggerganov/whisper.cpp) | 874 MB circa | MIT | Trascrizione multilingue, italiano prioritario |
+| [GTCRN](https://github.com/Xiaobin-Rong/gtcrn) | 523 KiB circa | MIT | Pulizia voce, distribuzione ONNX ufficiale sherpa-onnx |
 | [Qwen3 4B Q4_K_M](https://huggingface.co/Qwen/Qwen3-4B-GGUF) | 2,50 GB circa | Apache-2.0 | Proposte di dispensa |
 
 Revisioni immutabili, dimensioni e SHA-256 sono fissati in `aulalocale/models.py`. I download sono riprendibili e diventano disponibili solo dopo la verifica. Nessuna lezione viene inviata a Hugging Face. I motori usano file locali; llama.cpp viene avviato in modalità offline. Un modello mancante non attiva un servizio esterno di ripiego.
@@ -94,9 +95,9 @@ I runtime sono compilati da revisioni verificate di [whisper.cpp](https://github
 
 Importazione di MP3, WAV, M4A e FLAC fino a 512 MiB. Contenuto ed estensione devono corrispondere; la decodifica completa viene verificata prima dell'archiviazione. SHA-256 per duplicati nella stessa materia. Il limite viene applicato dopo il parsing multipart: non è ancora una protezione preventiva del traffico di un server pubblico.
 
-Le versioni migliorate sono MP3 a 96 kbit/s con filtri passa-alto, riduzione spettrale, normalizzazione dinamica e limitatore. Possono occupare più spazio dell'originale senza recuperare dettagli che non erano presenti. I preset sono da qualificare all'ascolto; non isolano il docente dalle altre voci.
+La pulizia IA usa GTCRN tramite sherpa-onnx, localmente su CPU: converte a 16 kHz mono, riduce il rumore e miscela il risultato con l’originale secondo l’intensità scelta. FFmpeg resta necessario per conversione, controllo del volume e MP3 a 96 kbit/s per il riascolto. È disponibile anche il percorso tradizionale con filtri passa-alto e riduzione spettrale. Il percorso IA conserva un WAV senza ulteriore compressione per la trascrizione (circa 1,92 MB al minuto), oltre al MP3. Il modello va scaricato esplicitamente da **Modelli locali**. Possono occupare più spazio dell'originale senza recuperare dettagli che non erano presenti. I preset sono da qualificare all'ascolto; non isolano il docente dalle altre voci né garantiscono la rimozione del riverbero.
 
-Whisper lavora sull'originale con normalizzazione del volume, in blocchi di dieci minuti. Titolo della materia, della lezione e descrizione forniscono un breve contesto al riconoscimento; i segmenti vengono separati ai confini delle parole. I timestamp sono riportati alla lezione completa; i confini dei blocchi possono influire sul riconoscimento. L'avanzamento si aggiorna al termine di ciascun blocco. Le correzioni salvano una nuova revisione, con controllo contro modifiche concorrenti. Una trascrizione corretta manualmente è protetta dalla ritrascrizione automatica.
+Whisper permette di scegliere l’originale o la versione migliorata, con normalizzazione del volume e blocchi di dieci minuti. Per GTCRN usa il WAV intermedio, evitando la ricompressione MP3; la revisione registra la provenienza. La pulizia non è un requisito per trascrivere e non garantisce meno errori: il confronto controllato è descritto in [docs/asr-comparison.md](docs/asr-comparison.md). Titolo della materia, della lezione e descrizione forniscono un breve contesto al riconoscimento; i segmenti vengono separati ai confini delle parole. I timestamp sono riportati alla lezione completa; i confini dei blocchi possono influire sul riconoscimento. L'avanzamento si aggiorna al termine di ciascun blocco. Le correzioni salvano una nuova revisione, con controllo contro modifiche concorrenti. Una trascrizione corretta manualmente è protetta dalla ritrascrizione automatica.
 
 Le dispense sono proposte basate sulle revisioni delle trascrizioni, con riferimenti a lezione, revisione, segmento e tempo. Il modello genera sezioni da blocchi di testo; l'organizzazione tematica e la deduplicazione semantica richiedono ulteriore qualificazione. Le sezioni modificate manualmente vengono preservate. Fonti cambiate e proposte basate su versioni superate sono segnalate e, quando necessario, ne viene impedita l'accettazione. Le revisioni precedenti restano nel database; la cronologia delle trascrizioni è consultabile dall’interfaccia in sola lettura.
 
@@ -138,6 +139,8 @@ Il Compose pubblica soltanto `127.0.0.1:8765`, conserva l'archivio in un volume 
 ```sh
 python -m pytest -q
 ```
+
+Per includere le due prove neurali effettive, impostare `AULALOCALE_GTCRN_TEST_MODEL` al percorso del modello locale verificato. Nessun peso viene scaricato dai test.
 
 Test con segnali sintetici, nessuna registrazione personale nel repository. Sono coperti autenticazione, archivio, Range audio, filtri effettivi FFmpeg, annullamento e recupero, revisioni, fonti, proposte, download e checksum, immagini, backup e ripristino. I test dell'orchestrazione delle dispense usano un adattatore controllato: sono distinti dalle prove reali dei modelli. Dettagli in [docs/verification.md](docs/verification.md).
 

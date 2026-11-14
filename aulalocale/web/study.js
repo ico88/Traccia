@@ -65,7 +65,7 @@ async function loadStudy() {
 $('transcribe-lesson').onclick=async()=>{
   if (!currentLesson)return;
   $('transcribe-lesson').disabled=true;
-  try {await request(`/api/v1/lessons/${currentLesson.id}/transcribe`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({language:'it',base_revision:currentTranscript?currentTranscript.id:null})});await loadStudy();}
+  try {await request(`/api/v1/lessons/${currentLesson.id}/transcribe`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({language:'it',base_revision:currentTranscript?currentTranscript.id:null,audio_job_id:$('transcription-source').value==='enhanced' && currentAudioJob?currentAudioJob.id:null})});await loadStudy();}
   catch(e){notify(e.message,true);$('transcribe-lesson').disabled=false;}
 };
 $('cancel-study').onclick=async()=>{if(activeStudyJob)try{await request(`/api/v1/study-jobs/${activeStudyJob.id}/cancel`,{method:'POST'});await loadStudy();}catch(e){notify(e.message,true);}};
@@ -89,7 +89,7 @@ async function loadModels(){
   for(const model of result.models){
     const card=document.createElement('article');card.className='model-card';
     const details=document.createElement('div'), title=document.createElement('h3'),meta=document.createElement('p'),status=document.createElement('p');
-    title.textContent=model.name;meta.textContent=`${(model.bytes/1073741824).toFixed(2)} GiB · ${model.license} · download verificato`;
+    title.textContent=model.name;meta.textContent=`${(model.bytes<1048576?(model.bytes/1024).toFixed(0)+' KiB':(model.bytes/1073741824).toFixed(2)+' GiB')} · ${model.license} · download verificato`;
     const names={installed:'Installato · pronto per lavorare offline',not_installed:'Da scaricare',queued:'In attesa di download',downloading:'Download in corso',verifying:'Verifica integrità',failed:model.error};
     status.textContent=names[model.status] || model.status;
     if(!result.runtimes[model.task])status.textContent+=' · runtime nativo da installare (vedi README)';

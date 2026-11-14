@@ -13,6 +13,12 @@ from aulalocale.app import create_app
 
 
 def main():
+    if '--internal-denoise' in sys.argv:
+        if sys.stdout is None:sys.stdout=open(1,'w',buffering=1,closefd=False)
+        if sys.stderr is None:sys.stderr=open(2,'w',buffering=1,closefd=False)
+        from aulalocale.ai_denoise import main as denoise
+        denoise(sys.argv[sys.argv.index('--internal-denoise')+1:])
+        return
     parser=argparse.ArgumentParser(description='AulaLocale local desktop launcher')
     parser.add_argument('--data',type=Path)
     parser.add_argument('--no-browser',action='store_true')

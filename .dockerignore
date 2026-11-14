@@ -12,3 +12,5 @@ outputs
 *.wav
 *.gguf
 *.bin
+
+*.onnx

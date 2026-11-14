@@ -223,6 +223,8 @@ function renderAudioJob() {
   const active = job && ['queued','running'].includes(job.status);
   const completed = job && job.status === 'completed';
   $('source-enhanced').disabled = !completed;
+  $('transcription-source').options[1].disabled=!completed;
+  if(!completed)$('transcription-source').value='original';
   $('enhance-audio').disabled = Boolean(active || completed);
   $('enhance-audio').textContent = completed ? 'Versione pronta' : 'Migliora audio';
   $('cancel-enhancement').hidden = !active;
@@ -241,10 +243,10 @@ function renderAudioJob() {
 async function refreshAudioJob() {
   clearTimeout(audioPollTimer);
   if (!currentLesson) return;
-  const id = currentLesson.id, preset = $('audio-preset').value;
+  const id = currentLesson.id, preset = $('audio-preset').value, method=$('audio-method').value;
   const jobs = await request(`/api/v1/lessons/${encodeURIComponent(id)}/enhancements`);
-  if (!currentLesson || currentLesson.id !== id || $('audio-preset').value !== preset) return;
-  currentAudioJob = jobs.find(job => job.preset === preset) || null;
+  if (!currentLesson || currentLesson.id !== id || $('audio-preset').value !== preset || $('audio-method').value !== method) return;
+  currentAudioJob = jobs.find(job => job.preset === preset && (job.method || 'traditional') === method) || null;
   renderAudioJob();
   if (currentAudioJob && ['queued','running','interrupted'].includes(currentAudioJob.status)) {
     audioPollTimer = setTimeout(() => refreshAudioJob().catch(e => notify(e.message,true)),1200);
@@ -287,7 +289,7 @@ $('enhance-audio').onclick = async () => {
   const id = currentLesson.id;
   $('enhance-audio').disabled = true;
   try {
-    const job = await request(`/api/v1/lessons/${encodeURIComponent(id)}/enhancements`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({preset:$('audio-preset').value})});
+    const job = await request(`/api/v1/lessons/${encodeURIComponent(id)}/enhancements`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({preset:$('audio-preset').value,method:$('audio-method').value})});
     if (currentLesson && currentLesson.id === id) { await refreshAudioJob(); }
     notify(job.status === 'completed' ? 'La versione migliorata è già pronta.' : 'Elaborazione avviata. Puoi continuare a usare l’archivio.');
   } catch(e) { notify(e.message,true); renderAudioJob(); }
@@ -318,3 +320,5 @@ $('quit-desktop').onclick=async()=>{
 bootstrapWorkspace().catch(e => { if (!$('login-view').hidden) return; notify(e.message, true); });
 
 $('lesson-search').oninput = renderLessons;
+
+$('audio-method').onchange = $('audio-preset').onchange;
