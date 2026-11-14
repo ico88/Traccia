@@ -1,0 +1,23 @@
+# Local environments and private content
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+.env.*
+!.env.example
+.DS_Store
+data/
+models/
+work/
+outputs/
+*.mp3
+*.wav
+*.m4a
+*.flac
+*.mp4
+*.pdf
+*.sqlite*
+*.db
+*.gguf
+*.bin
