@@ -6,6 +6,8 @@ Da una lezione registrata a materiale di studio organizzato per materia, sul pro
 
 AulaLocale è pensato per studenti universitari: conservare e riascoltare le lezioni con audio migliorato, correggere le trascrizioni e costruire dispense che crescono con il corso. L'elaborazione IA sarà locale, senza API di inferenza esterne o abbonamenti obbligatori.
 
+Il codice applicativo è sul branch [`sviluppo`](https://github.com/ico88/aulalocale/tree/sviluppo); `main` conserva la documentazione iniziale fino alla prima approvazione.
+
 ## Stato attuale
 
 Questa prima base implementa un'API locale con archivio SQLite, creazione e consultazione delle materie, autenticazione tramite token locale e test automatici. Non implementa ancora importazione audio, trascrizione, denoising, dispense o interfaccia grafica.
@@ -72,7 +74,7 @@ Non committare registrazioni, trascrizioni reali, dati personali, credenziali o 
 
 - `main`: base approvata; promozioni soltanto dopo conferma del responsabile del progetto.
 - `sviluppo`: ramo di lavoro e integrazione.
-- Passaggio tramite pull request `sviluppo` → `main`, con verifiche automatiche e conferma esplicita prima del merge. Nessun auto-merge.
+- Passaggio tramite pull request `sviluppo` → `main`, con test e conferma esplicita prima del merge. Nessun auto-merge.
 
 Il primo commit su `main` contiene soltanto la costituzione del repository; il codice applicativo nasce su `sviluppo`.
 
@@ -83,3 +85,7 @@ Consultare [CONTRIBUTING.md](CONTRIBUTING.md), [architettura](docs/architecture.
 La licenza del codice deve ancora essere scelta dal titolare. Repository pubblico non equivale a licenza open source; nessuna licenza di riuso viene concessa implicitamente. Le dipendenze mantengono le proprie licenze.
 
 [VoiceStudio](https://github.com/debpalash/voicestudio) è un riferimento per l'esperienza di installazione e gestione modelli. Non è stato copiato codice da VoiceStudio e questo progetto non è affiliato al suo autore.
+
+## Attivazione della CI
+
+I test sono eseguibili localmente. Il modello di workflow è in `docs/ci-workflow.yml`: deve essere spostato in `.github/workflows/ci.yml` quando la credenziale GitHub dispone del permesso `workflow`. La CI GitHub non è ancora attiva. Dopo la prima esecuzione, rendere obbligatorio il controllo `backend-tests` nella protezione di `main`.
