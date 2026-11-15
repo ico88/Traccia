@@ -1,4 +1,4 @@
-import json,sqlite3
+import json,sqlite3,sys
 from uuid import uuid4
 from fastapi.testclient import TestClient
 from aulalocale.app import create_app
@@ -17,6 +17,7 @@ def test_fabricated_quotes_and_changed_doses_are_not_supported():
 
 def test_local_evidence_job_preserves_the_note_and_checks_subject(tmp_path,monkeypatch):
     sid,lid,rid,segment=seeded(tmp_path);enable_fake_llm(monkeypatch,tmp_path);note,chapter=str(uuid4()),str(uuid4())
+    monkeypatch.setattr('aulalocale.evidence.runtime_path',lambda name:sys.executable)
     chapters=[{'id':chapter,'title':'Recettori','text':'Il recettore lega il farmaco.','manual':True,'sources':[{'lesson_id':lid,'revision_id':rid,'segment_id':segment['id'],'start':0}]}]
     with sqlite3.connect(tmp_path/'aulalocale.sqlite3') as c:c.execute('INSERT INTO notes VALUES (?,?,?,?,1,?)',(note,sid,None,json.dumps(chapters),'2026-01-01'))
     monkeypatch.setattr(StudyEngine,'llm',lambda *a,**kw:{'checks':[{'claim':1,'status':'supported','source':1,'quote':segment['text'],'reason':'Explicitly stated.'}]})
