@@ -21,3 +21,8 @@ outputs/
 *.db
 *.gguf
 *.bin
+
+runtimes/
+*.part
+
+*.onnx

@@ -1,0 +1,13 @@
+fastapi==0.162.7
+uvicorn==0.54.0
+starlette==1.10.0
+pydantic==2.14.3
+python-multipart==0.0.33
+mutagen==1.48.1
+imageio-ffmpeg==0.8.1
+certifi==2026.10.23
+Pillow==13.0.0
+numpy==2.4.6
+sherpa-onnx==2.0.1
+sherpa-onnx-core==2.0.1
+pywebview==6.2.1; sys_platform == 'darwin'

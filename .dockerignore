@@ -1,0 +1,16 @@
+.git
+.venv
+__pycache__
+.pytest_cache
+.env*
+data
+models
+runtimes
+work
+outputs
+*.mp3
+*.wav
+*.gguf
+*.bin
+
+*.onnx
