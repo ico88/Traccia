@@ -15,6 +15,9 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+# Prefer the source-pinned bundled CLI; explicit user overrides still take precedence.
+_bundled_ffmpeg=Path(__file__).resolve().parent.parent/'runtimes'/'ffmpeg'
+if _bundled_ffmpeg.is_file():os.environ.setdefault('IMAGEIO_FFMPEG_EXE',str(_bundled_ffmpeg))
 from .lessons import lessons_router, migrate_lessons
 from .enhancement import AudioWorker, enhancement_router, migrate_enhancement
 from .models import ModelManager, models_router

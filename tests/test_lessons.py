@@ -142,3 +142,20 @@ def test_upgrade_existing_database(tmp_path):
     with sqlite3.connect(tmp_path / "aulalocale.sqlite3") as conn:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == 5
         assert conn.execute("SELECT title FROM subjects WHERE id='old'").fetchone()[0] == "Existing"
+
+
+def test_eight_bit_pcm_wav_import_and_processing(tmp_path):
+    import time
+    audio=io.BytesIO()
+    with wave.open(audio,'wb') as wav:
+        wav.setparams((1,1,16000,0,'NONE','not compressed'));wav.writeframes(bytes([120,136])*8000)
+    with TestClient(create_app(tmp_path,TOKEN)) as client:
+        response=upload(client,subject(client),audio.getvalue(),'eight-bit.wav');assert response.status_code==201,response.text
+        lid=response.json()['id'];job=client.post(f'/api/v1/lessons/{lid}/enhancements',headers=HEADERS,json={'method':'traditional'}).json()
+        deadline=time.monotonic()+10
+        while time.monotonic()<deadline:
+            result=client.get('/api/v1/audio-jobs/'+job['id'],headers=HEADERS).json()
+            if result['status'] not in ('queued','running'):break
+            time.sleep(.02)
+        assert result['status']=='completed',result
+        assert client.get(f'/api/v1/lessons/{lid}/audio',headers=HEADERS).content==audio.getvalue()

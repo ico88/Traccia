@@ -4,7 +4,7 @@ Work against `sviluppo`, run `python -m pytest` for backend changes, and keep th
 
 Use synthetic fixtures. Never commit personal recordings, lecture transcripts, models, secrets or compiled runtimes. Do not add cloud inference APIs. Check model and dependency licenses before introducing them.
 
-The code license has not been selected yet. Please agree substantial external contributions with the owner in advance.
+Traccia is GPL-3.0-or-later. Contributions must be compatible with this license; third-party components retain their own terms.
 
 ## Interface languages
 

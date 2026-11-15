@@ -15,17 +15,19 @@ def main():
     parser=argparse.ArgumentParser();parser.add_argument('--output',type=Path,required=True);parser.add_argument('--dmg',action='store_true');args=parser.parse_args()
     if sys.platform!='darwin' or platform.machine()!='arm64':raise SystemExit('Build on an Apple Silicon Mac')
     output=args.output.resolve();output.mkdir(parents=True,exist_ok=True)
-    binaries=[ROOT/'runtimes'/name for name in ['whisper-cli','llama-cli']]
+    binaries=[ROOT/'runtimes'/name for name in ['whisper-cli','llama-cli','ffmpeg']]
     if not all(path.is_file() for path in binaries):raise SystemExit('Run scripts/setup_runtimes.py first')
     command=[sys.executable,'-m','PyInstaller','--noconfirm','--windowed','--onedir','--name','Traccia','--icon',str(ROOT/'branding'/'Traccia.icns'),
              '--osx-bundle-identifier','it.aulalocale.desktop','--distpath',str(output),'--workpath',str(ROOT/'work'/'pyinstaller'),
-             '--specpath',str(ROOT/'work'),'--paths',str(ROOT),
-             '--hidden-import','webview.platforms.cocoa','--hidden-import','WebKit','--hidden-import','AppKit','--hidden-import','Foundation','--collect-all','webview','--collect-all','imageio_ffmpeg','--collect-all','mutagen','--collect-all','sherpa_onnx','--collect-all','uvicorn',
+             '--additional-hooks-dir',str(ROOT/'scripts'/'hooks'),'--specpath',str(ROOT/'work'),'--paths',str(ROOT),
+             '--hidden-import','webview.platforms.cocoa','--hidden-import','WebKit','--hidden-import','AppKit','--hidden-import','Foundation','--collect-all','webview','--collect-all','mutagen','--collect-all','sherpa_onnx','--collect-all','uvicorn',
              '--add-data',f'{ROOT / "aulalocale" / "web"}:aulalocale/web']
     for dependency in ['mutagen','imageio-ffmpeg','Pillow','fastapi','uvicorn','starlette','pydantic','certifi','numpy','sherpa-onnx','sherpa-onnx-core','pywebview','pyobjc-core','pyobjc-framework-Cocoa','pyobjc-framework-WebKit']:
         command+=['--copy-metadata',dependency]
     if (ROOT/'runtimes'/'licenses').is_dir():command+=['--add-data',f'{ROOT / "runtimes" / "licenses"}:runtimes/licenses']
     for binary in binaries:command+=['--add-binary',f'{binary}:runtimes']
+    subprocess.run([sys.executable,str(ROOT/'scripts'/'export_notices.py'),'--output',str(ROOT/'work'/'third-party-notices')],check=True)
+    command+=['--add-data',f'{ROOT / "work" / "third-party-notices"}:third-party-notices','--add-data',f'{ROOT / "LICENSE"}:LICENSE']
     command.append(str(ROOT/'scripts'/'desktop_entry.py'))
     subprocess.run(command,check=True)
     bundle=output/'Traccia.app'
