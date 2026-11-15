@@ -5,7 +5,7 @@ const TRANSCRIPT_PAGE_SIZE = 40;
 let reviewCursor=null, previewRange=null, transcriptSaving=false;
 let activeStudyJob = null, activeView = 'library', notesTimer = null, modelsTimer = null;
 let currentNotes = null, editingChapter = null, historicalNotes=null;
-function mayLeaveTranscript() { return (!transcriptDirty && !window.aulalocaleSpeakersDirty) || window.confirm(T('Ci sono correzioni non salvate. Vuoi abbandonarle?')); }
+function mayLeaveTranscript() { return (!transcriptDirty && !window.aulalocaleSpeakersDirty && !(typeof workspaceHasUnsavedChanges==='function' && workspaceHasUnsavedChanges())) || window.confirm(T('Ci sono correzioni non salvate. Vuoi abbandonarle?')); }
 const readableTime = seconds => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2,'0')}`;
 function resetStudy() {
   if(typeof resetSpeakers==='function')resetSpeakers();
@@ -17,9 +17,11 @@ function resetStudy() {
 }
 function showStudyView(view) {
   activeView = view; clearTimeout(notesTimer); clearTimeout(modelsTimer);
-  for (const name of ['library','notes','models']) $(name+'-view').hidden = name !== view;
+  for (const name of ['library','notes','models','search','templates','preferences']) if($(name+'-view'))$(name+'-view').hidden = name !== view;
   $('view-library').setAttribute('aria-pressed',String(view === 'library'));
   $('view-notes').setAttribute('aria-pressed',String(view === 'notes'));
+  for(const name of ['search','templates','preferences'])if($('view-'+name))$('view-'+name).setAttribute('aria-pressed',String(view===name));
+  if(typeof workspaceRoute==='function')workspaceRoute(view);
 }
 $('view-library').onclick = () => showStudyView('library');
 $('view-notes').onclick = () => { showStudyView('notes'); loadNotes().catch(e=>notify(e.message,true)); };
@@ -80,10 +82,11 @@ async function loadStudy() {
   $('cancel-study').hidden=!activeStudyJob; $('study-progress').hidden=!activeStudyJob;
   if (activeStudyJob) {
     $('study-progress').value=activeStudyJob.progress;
-    $('transcript-status').textContent=activeStudyJob.status==='queued'?T('In coda: attendo il motore locale.'):T`${activeStudyJob.kind==='speakers'?T('Analisi parlanti'):T('Trascrizione')} in corso · ${Math.floor(activeStudyJob.progress)}%. L’avanzamento si aggiorna al termine di ogni blocco.`;
+    $('transcript-status').textContent=activeStudyJob.kind==='pipeline'?(activeStudyJob.stage==='notes'?T('Fase: proposta dispensa'):T('Fase: trascrizione'))+' · '+Math.floor(activeStudyJob.progress)+'%':activeStudyJob.status==='queued'?T('In coda: attendo il motore locale.'):T`${activeStudyJob.kind==='speakers'?T('Analisi parlanti'):T('Trascrizione')} in corso · ${Math.floor(activeStudyJob.progress)}%. L’avanzamento si aggiorna al termine di ogni blocco.`;
     studyTimer=setTimeout(()=>loadStudy().catch(e=>notify(e.message,true)),2000);
   } else if (currentTranscript) $('transcript-status').textContent=historicalTranscript?T('Revisione storica in sola lettura. Scegli l’ultima revisione per modificare.'):T('Testo automatico da verificare ascoltando i timestamp. Le correzioni vengono salvate in una nuova revisione.');
   else $('transcript-status').textContent=jobs[0] && jobs[0].status==='failed'?jobs[0].error:T('Whisper Turbo · italiano · elaborazione sul dispositivo. Installa il modello nella sezione Modelli locali.');
+  if($('start-workflow')){$('start-workflow').disabled=Boolean(activeStudyJob || transcriptDirty || historicalTranscript || currentTranscript?.metadata.manual);const pipeline=jobs.find(job=>job.kind==='pipeline');if(pipeline)$('workflow-status').textContent=pipeline.status==='completed'?T('Proposta pronta: apri Dispensa per verificarla.'):pipeline.error || (pipeline.stage==='notes'?T('Fase: proposta dispensa'):T('Fase: trascrizione'));}
 }
 $('transcribe-lesson').onclick=async()=>{
   if (!currentLesson)return;
@@ -189,7 +192,7 @@ async function loadNotes(){
 $('generate-notes').onclick=async()=>{if(!selected)return;$('generate-notes').disabled=true;try{await request(`/api/v1/subjects/${selected}/notes/generate?language=${$('notes-language').value}`,{method:'POST'});await loadNotes();}catch(e){notify(e.message,true);$('generate-notes').disabled=false;}};
 $('chapter-form').onsubmit=async event=>{event.preventDefault();if(!currentNotes || !editingChapter || historicalNotes)return;const button=event.submitter;button.disabled=true;try{await request(`/api/v1/subjects/${selected}/notes`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({base_revision:currentNotes.id,chapter_id:editingChapter.id,title:$('chapter-title').value,text:$('chapter-text').value})});$('chapter-dialog').close();await loadNotes();}catch(e){notify(e.message,true);}finally{button.disabled=false;}};
 $('print-notes').onclick=()=>window.print();
-window.addEventListener('beforeunload',event=>{if(transcriptDirty){event.preventDefault();event.returnValue='';}});
+window.addEventListener('beforeunload',event=>{if(transcriptDirty || typeof workspaceHasUnsavedChanges==='function' && workspaceHasUnsavedChanges()){event.preventDefault();event.returnValue='';}});
 
 async function loadMaterials(id){
   const images=await request(`/api/v1/subjects/${id}/materials`);if(selected!==id || activeView!=='notes')return;
