@@ -99,7 +99,7 @@ def test_legacy_schema_five_backup_restores_and_upgrades_without_overwrite(tmp_p
     restored=tmp_path/'restored';restore(archive,restored)
     with sqlite3.connect(restored/'aulalocale.sqlite3') as c:assert c.execute('PRAGMA user_version').fetchone()[0]==5
     with TestClient(create_app(restored,TOKEN)) as client:assert client.get('/health').status_code==200
-    with sqlite3.connect(restored/'aulalocale.sqlite3') as c:assert c.execute('PRAGMA user_version').fetchone()[0]==6
+    with sqlite3.connect(restored/'aulalocale.sqlite3') as c:assert c.execute('PRAGMA user_version').fetchone()[0]==7
     assert db.read_bytes()==raw
 
 

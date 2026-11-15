@@ -1,2 +1,2 @@
-__version__ = "0.11.0.dev0"
-ARCHIVE_SCHEMA = 6
+__version__ = "0.11.0.dev1"
+ARCHIVE_SCHEMA = 7

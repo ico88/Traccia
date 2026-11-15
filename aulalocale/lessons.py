@@ -22,7 +22,7 @@ from .suggestions import audio_suggestions
 
 MAX_UPLOAD_BYTES = 512 * 1024 * 1024
 FORMATS = {".mp3": (MP3, "audio/mpeg"), ".wav": (WAVE, "audio/wav"),
-           ".flac": (FLAC, "audio/flac"), ".m4a": (MP4, "audio/mp4")}
+           ".flac": (FLAC, "audio/flac"), ".m4a": (MP4, "audio/mp4"), ".mp4": (MP4, "video/mp4")}
 
 
 class Lesson(BaseModel):
