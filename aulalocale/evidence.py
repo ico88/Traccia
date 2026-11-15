@@ -27,7 +27,9 @@ def validate_checks(claims,sources,answer):
   if status=='supported':
    claim=claims[claim_id-1]
    quantities=re.findall(r'\d+(?:[.,]\d+)?\s*(?:mg\b|mcg\b|µg\b|ml\b|mmol\b|g\b|%)',claim.casefold())
-   if not valid or any(normalized(q) not in normalized(quote) for q in quantities):status='uncertain';reason='Evidence quote missing, not found verbatim, or does not contain the claimed quantity.'
+   quoted_quantities=re.findall(r'(?<![\w.,])\d+(?:[.,]\d+)?\s*(?:mg\b|mcg\b|µg\b|ml\b|mmol\b|g\b|%)',quote.casefold())
+   quantity_key=lambda q:re.sub(r'\s+','',q).replace(',','.')
+   if not valid or not {quantity_key(q) for q in quantities}.issubset({quantity_key(q) for q in quoted_quantities}):status='uncertain';reason='Evidence quote missing, not found verbatim, or does not contain the claimed quantity.'
   result.append({'claim':claims[claim_id-1],'status':status,'source':source if valid else None,'quote':quote if valid else '', 'reason':reason,'quote_matched':valid})
  return result
 

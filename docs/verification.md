@@ -83,7 +83,7 @@ Browser and packaged Mac checks confirmed English/Italian switching. The Mac pre
 
 ## Roadmap development 0.11
 
-99 backend tests passed, with explicit local GTCRN weights. Added checks cover interval previews, refusal of preview-as-full-transcription input, accepted-only history, reversible derivative quarantine, symlink refusal, legacy-backup restore, archive locking before migration, PDF page/fingerprint provenance, source-map anchors, human-reference weighted scoring, and conservative quote/quantity validation.
+100 backend tests passed, with explicit local GTCRN weights. Added checks cover interval previews, refusal of preview-as-full-transcription input, accepted-only history, reversible derivative quarantine, symlink refusal, legacy-backup restore, archive locking before migration, PDF page/fingerprint provenance, source-map anchors, human-reference weighted scoring, and conservative quote/quantity validation.
 
 Real UI checks on public/synthetic demo material completed a five-second GTCRN preview, historical read-only selection, PDF figure import and source-map generation. Qwen completed a local four-claim source check and classified the unsupported demo claims as uncertain. That is a bounded functional trial, not a measured entailment benchmark. The packaged PDF subprocess extracted the synthetic figure successfully.
 

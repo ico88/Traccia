@@ -35,3 +35,10 @@ def test_topic_retrieval_prioritizes_rare_specific_terms_and_excludes_manual():
     chapters=[{'title':'Introduction','text':'General course study notes and basic concepts.','manual':False},{'title':'Adrenergic receptors','text':'Selective beta antagonists influence adrenergic signaling.','manual':False},{'title':'Adrenergic receptors','text':'Private correction','manual':True}]
     assert candidates(chapters,{'title':'Beta antagonists','text':'Selective adrenergic antagonists.'})[0][0]==1
     assert all(not chapter['manual'] for _,chapter in candidates(chapters,{'title':'x','text':'y'}))
+
+
+def test_quantity_comparison_uses_complete_numeric_tokens():
+    for claim_quantity,quote_quantity in [('5','15'),('5','0.5'),('0.5','10.5'),('5','5.5')]:
+        quote=f'The dose is {quote_quantity} mg daily.'
+        check={'claim':1,'status':'supported','source':1,'quote':quote,'reason':'Matches'}
+        assert validate_checks([f'The dose is {claim_quantity} mg daily.'],[{'text':quote}],{'checks':[check]})[0]['status']=='uncertain'
