@@ -80,3 +80,11 @@ Pacchetto Mac 0.8 verificato: avvio del server incluso, risorse web, GTCRN, Whis
 84 backend tests passed, including validation of note output language and authenticated desktop preference persistence across launcher instances. The JavaScript i18n check covers English/Italian rendering, fallback, placeholder safety, preference storage, preservation of user text and guards against language changes while recording or with unsaved edits.
 
 Browser and packaged Mac checks confirmed English/Italian switching. The Mac preference was saved, the app closed and restarted on a different loopback port, and English was retained. Existing course text remained unchanged. New-note prompts were checked for the requested output language using a controlled LLM adapter; this does not measure English summary quality. Some backend diagnostics, generated map labels and operating-system media controls retain their source/system language.
+
+## Roadmap development 0.11
+
+99 backend tests passed, with explicit local GTCRN weights. Added checks cover interval previews, refusal of preview-as-full-transcription input, accepted-only history, reversible derivative quarantine, symlink refusal, legacy-backup restore, archive locking before migration, PDF page/fingerprint provenance, source-map anchors, human-reference weighted scoring, and conservative quote/quantity validation.
+
+Real UI checks on public/synthetic demo material completed a five-second GTCRN preview, historical read-only selection, PDF figure import and source-map generation. Qwen completed a local four-claim source check and classified the unsupported demo claims as uncertain. That is a bounded functional trial, not a measured entailment benchmark. The packaged PDF subprocess extracted the synthetic figure successfully.
+
+The Linux Docker build and startup/auth/native-runtime smoke check passed on a GitHub-hosted runner. It is not an i7 performance measurement. No valid signing identities were found on the development Mac; no Developer ID signing/notarization or clean-second-Mac qualification is claimed.

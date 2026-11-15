@@ -9,6 +9,7 @@ import fcntl
 import subprocess
 import logging
 import json
+import re
 from tempfile import TemporaryDirectory
 from importlib.metadata import version
 from .ai_denoise import worker_command
@@ -33,6 +34,8 @@ class EnhancementInput(BaseModel):
     preset: Literal['light', 'balanced', 'strong'] = 'balanced'
     method: Literal['traditional','gtcrn','voxlock'] = 'traditional'
     gain_db:Literal[0,3,6,9,12]=0
+    preview_start:float | None=Field(default=None,ge=0)
+    preview_end:float | None=Field(default=None,ge=0)
     reference_start:float | None=Field(default=None,ge=0)
     reference_end:float | None=Field(default=None,ge=0)
 
@@ -58,11 +61,18 @@ class AudioJob(BaseModel):
     @computed_field
     @property
     def gain_db(self)->int:
-        return int(self.preset.rsplit('-g',1)[1]) if '-g' in self.preset else 0
+        match=re.search(r'-g(3|6|9|12)(?:-|$)',self.preset)
+        return int(match.group(1)) if match else 0
+
+    @computed_field
+    @property
+    def preview(self)->dict | None:
+        try:return json.loads(self.filter).get('preview')
+        except (ValueError,TypeError):return None
 
     @field_serializer('preset')
     def preset_name(self,value):
-        return value.removeprefix('gtcrn-').removeprefix('voxlock-').split('-g')[0]
+        return value.removeprefix('gtcrn-').removeprefix('voxlock-').split('-g')[0].split('-preview-')[0]
 
 
 def migrate_enhancement(connection):
@@ -91,13 +101,17 @@ class AudioWorker:
         self.thread = None
         self.lease = None
 
-    def start(self):
+    def acquire_lease(self):
+        if self.lease is not None and not self.lease.closed:return
         self.lease = (self.root / 'audio-worker.lock').open('a')
         try:
             fcntl.flock(self.lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
-            self.lease.close()
+            self.lease.close();self.lease=None
             raise RuntimeError('Archive already open in another worker; use one server process')
+
+    def start(self):
+        self.acquire_lease();self.stop_event.clear()
         self.outputs = self.root / 'enhanced'
         self.outputs.mkdir(exist_ok=True)
         with closing(self.connect()) as connection, connection:
@@ -121,7 +135,7 @@ class AudioWorker:
                         self.process.kill()
                 self.thread.join()
         if self.lease:
-            self.lease.close()
+            self.lease.close();self.lease=None
 
     def get(self, job_id):
         with closing(self.connect()) as connection:
@@ -186,6 +200,7 @@ class AudioWorker:
     def execute(self, job):
         identifier=job['id'];partial=self.outputs/(identifier+'.part.mp3');final=self.outputs/(identifier+'.mp3')
         wave_partial=self.outputs/(identifier+'.part.wav');wave_final=self.outputs/(identifier+'.wav')
+        preview_temp=None
         try:
             with self.lock:
                 if self.stop_event.is_set() or self.get(identifier)['status']!='queued':return
@@ -199,12 +214,20 @@ class AudioWorker:
             engine=(('VoxLock' if vox else 'GTCRN')+' / sherpa-onnx '+version('sherpa-onnx')+'; '+ffmpeg_version) if ai else ffmpeg_version
             with closing(self.connect()) as c,c:c.execute('UPDATE audio_jobs SET engine=? WHERE id=?',(engine,identifier))
             common=[executable,'-nostdin','-v','error','-y','-protocol_whitelist','file,pipe']
+            duration=lesson['duration_seconds']
+            try:stored_recipe=json.loads(job['filter'])
+            except ValueError:stored_recipe={}
+            if stored_recipe.get('preview'):
+                clip=stored_recipe['preview'];duration=clip['end']-clip['start']
+                preview_temp=TemporaryDirectory(prefix='preview-',dir=self.outputs);clipped=Path(preview_temp.name)/'input.wav'
+                if not self.run_stage(common+['-ss',str(clip['start']),'-i',str(source),'-t',str(duration),'-ac','1','-ar','16000','-c:a','pcm_s16le',str(clipped)],identifier,duration,0,5):return
+                source=clipped
             if ai:
                 recipe=json.loads(job['filter']);model=self.models.require('voxlock-chunk' if vox else 'gtcrn')
                 with TemporaryDirectory(prefix='gtcrn-',dir=self.outputs) as temporary:
                     decoded=Path(temporary)/'input.wav'
                     command=common+['-i',str(source),'-map','0:a:0','-vn','-ac','1','-ar','16000','-c:a','pcm_s16le','-progress','pipe:1','-nostats',str(decoded)]
-                    if not self.run_stage(command,identifier,lesson['duration_seconds'],0,10):return
+                    if not self.run_stage(command,identifier,duration,0,10):return
                     extra=[]
                     if vox:
                         reference=Path(temporary)/'reference.wav'
@@ -212,12 +235,12 @@ class AudioWorker:
                         if not self.run_stage(command,identifier,recipe['reference_end']-recipe['reference_start'],10,1):return
                         extra=['--enroll-model',str(self.models.require('voxlock-enroll')),'--voice-sample',str(reference)]
                     command=worker_command()+['--input',str(decoded),'--output',str(wave_partial),'--model',str(model),'--strength',str(recipe['strength'])]+extra
-                    if not self.run_stage(command,identifier,lesson['duration_seconds'],10,75):return
+                    if not self.run_stage(command,identifier,duration,10,75):return
                     command=common+['-i',str(wave_partial),'-af',recipe['postfilter'],'-map_metadata','-1','-c:a','libmp3lame','-b:a','96k','-progress','pipe:1','-nostats',str(partial)]
-                    if not self.run_stage(command,identifier,lesson['duration_seconds'],85,14):return
+                    if not self.run_stage(command,identifier,duration,85,14):return
             else:
-                command=common+['-i',str(source),'-map','0:a:0','-vn','-af',job['filter'],'-map_metadata','-1','-c:a','libmp3lame','-b:a','96k','-progress','pipe:1','-nostats',str(partial)]
-                if not self.run_stage(command,identifier,lesson['duration_seconds']):return
+                command=common+['-i',str(source),'-map','0:a:0','-vn','-af',stored_recipe.get('traditional_filter',job['filter']),'-map_metadata','-1','-c:a','libmp3lame','-b:a','96k','-progress','pipe:1','-nostats',str(partial)]
+                if not self.run_stage(command,identifier,duration):return
             with self.lock:
                 if self.get(identifier)['status']=='cancelled':return
                 if self.stop_event.is_set():self.update(identifier,'interrupted');return
@@ -237,6 +260,7 @@ class AudioWorker:
                     self.process.wait()
                     if self.process.stdout:self.process.stdout.close()
                 self.process=None;self.active_id=None
+            if preview_temp is not None:preview_temp.cleanup()
             for path in [partial,wave_partial]:path.unlink(missing_ok=True)
             if self.get(identifier)['status']!='completed':
                 final.unlink(missing_ok=True);wave_final.unlink(missing_ok=True)
@@ -275,6 +299,13 @@ def enhancement_router(root, connect, authenticate, worker):
             if options.method=='traditional':recipe+=gain
             else:
                 data=json.loads(recipe);data['postfilter']+=gain;recipe=json.dumps(data,sort_keys=True)
+        if options.preview_start is not None or options.preview_end is not None:
+            if options.method=='voxlock' or options.preview_start is None or options.preview_end is None or not .5<=options.preview_end-options.preview_start<=60 or options.preview_end>lesson['duration_seconds']:
+                raise HTTPException(422,'Choose a 0.5–60 second interval within the lecture; preview supports GTCRN or traditional filters')
+            import hashlib
+            data=json.loads(recipe) if options.method!='traditional' else {'traditional_filter':recipe}
+            data['preview']={'start':options.preview_start,'end':options.preview_end}
+            recipe=json.dumps(data,sort_keys=True);key+='-preview-'+hashlib.sha256(recipe.encode()).hexdigest()[:16]
         with worker.lock:
             with closing(connect()) as connection, connection:
                 row = connection.execute("SELECT * FROM audio_jobs WHERE lesson_id=? AND preset=? AND (status IN ('queued','running') OR (status='completed' AND filter=?)) ORDER BY created_at DESC LIMIT 1",

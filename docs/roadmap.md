@@ -1,29 +1,20 @@
 # Roadmap
 
-## Implementato nel ramo sviluppo
+[Current implementation detail and remaining qualifications](roadmap-0.11.md) · [Private evaluation method](evaluation.md) · [Downloadable 0.10 preview](https://github.com/ico88/Traccia/releases/tag/v0.10.0)
 
-- Archivio materie e lezioni, metadati, importazione assistita e drag and drop.
-- UI biblioteca / area di studio / dispensa / modelli locali.
-- Audio originale e derivati, tre preset tradizionali, confronto sincronizzato.
-- Coda persistente, avanzamento, annullamento e recupero.
-- Download esplicito dei pesi con revisioni e checksum.
-- Trascrizione nativa locale con segmenti temporali e correzioni versionate.
-- Proposte di dispensa da trascrizioni, fonti, accettazione e protezione delle modifiche manuali.
-- Immagini della materia, mappe dei capitoli, esportazione e backup/ripristino.
-- Pulizia IA GTCRN, revisione guidata dei passaggi, confronto delle modifiche della dispensa e primo consolidamento incrementale per argomenti.
-- Interfaccia inglese/italiano, preferenza persistente e lingua separata per trascrizione e nuove sezioni della dispensa.
-- Finestra Mac WebKit, registrazione microfono con recupero bozze, ruoli dei parlanti, isolamento VoxLock sperimentale e guadagno selezionabile.
-- Script di build dei runtime e configurazione Docker.
+## Delivered foundation
 
-## Prossime verifiche e sviluppi
+Local Apple Silicon app, subject/lecture library, recording and recoverable drafts, GTCRN cleanup, experimental speaker tools, Whisper transcripts, protected revisions, incremental course-note proposals, image materials, export/backup, English/Italian interface and pinned local model downloads.
 
-1. Qualità su più lezioni reali, riferimento manuale e confronto WER/CER; lessico specialistico e confini dei blocchi.
-2. Qualificazione del consolidamento tematico implementato, migliore ricerca dei capitoli correlati e verifica semantica delle citazioni.
-3. Anteprima della pulizia su un intervallo e qualificazione percettiva del motore GTCRN sul rumore d’aula (riascolto dei segmenti già implementato).
-4. Cronologia delle dispense nell'interfaccia e riconciliazione degli asset orfani.
-5. Supporto slide/PDF con estrazione figure e schemi didattici generati verificabili.
-6. Build container e benchmark effettivo sul server i7; successivamente autenticazione e archivi multiutente.
-7. Licenza del progetto e inventario di ridistribuzione; firma Developer ID, notarizzazione, aggiornamenti e prova su Mac pulito.
-8. Attivazione CI GitHub dopo disponibilità del permesso workflow.
+## Workstreams
 
-Promozioni su main soltanto dopo conferma esplicita. Nessuna data di rilascio o qualità garantita prima delle verifiche.
+1. **Quality:** three real recordings sampled across nine intervals; 24 conditions executed. Manual reference/listening worksheets and weighted WER/CER scoring are ready. Human-reviewed text and listening ratings remain required.
+2. **Thematic consolidation:** improved rare-term/title retrieval and optional queued local claim/source review. Exact quotation and quantity checks support review; representative semantic accuracy remains unqualified.
+3. **Audio:** short-interval GTCRN/traditional preview and A/B playback implemented. Classroom listening qualification is pending; use the private worksheet.
+4. **History/health:** accepted note history and read-only historical views; archive health, missing/orphan reports and reversible derivative quarantine/restore implemented. Originals are never automatically removed.
+5. **Figures/diagrams:** bounded PDF raster extraction with page/fingerprint provenance and source-linked diagrams implemented. Vector-only extraction, automatic placement and generated scientific illustrations remain future work.
+6. **Server:** Linux container build/start/auth/runtime smoke check passed in GitHub CI. The i7 benchmark is on hold at the owner's request; multi-user authentication and separate account archives follow server validation.
+7. **Distribution:** GPL-3.0-or-later, dependency notices, corresponding sources, non-notarized downloadable DMG and checksums delivered. Developer ID/notarization, signed unattended updates and a clean second Mac still require external setup/validation.
+8. **CI:** backend and container checks active; `backend-tests` is required on main. Private recordings and model weights are not uploaded to CI.
+
+No date or quality guarantee is implied. Application promotions to main require the project owner's authorization; automatic merges remain disabled.

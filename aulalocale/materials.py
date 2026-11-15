@@ -16,6 +16,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps, PngImagePlugin, Unidentif
 from datetime import datetime
 from pydantic import BaseModel
 import textwrap
+import subprocess,sys,shutil
 
 MAX_IMAGE_BYTES=20*1024*1024
 Image.MAX_IMAGE_PIXELS=20_000_000
@@ -25,7 +26,8 @@ def migrate_materials(c):
     c.execute('''CREATE TABLE IF NOT EXISTS materials(id TEXT PRIMARY KEY,
         subject_id TEXT NOT NULL REFERENCES subjects(id),caption TEXT NOT NULL,
         filename TEXT NOT NULL,width INTEGER NOT NULL,height INTEGER NOT NULL)''')
-    c.execute('PRAGMA user_version=5')
+    from . import ARCHIVE_SCHEMA
+    c.execute('PRAGMA user_version='+str(ARCHIVE_SCHEMA))
 
 
 class OutlineInput(BaseModel):
@@ -61,6 +63,39 @@ def materials_router(root,connect,authenticate,worker):
         except Exception:
             target.unlink(missing_ok=True);raise
         return {'id':identifier,'subject_id':str(subject_id),'caption':caption.strip(),'width':width,'height':height}
+
+    @router.post('/subjects/{subject_id}/materials/pdf',status_code=201)
+    def upload_pdf(subject_id:UUID,file:UploadFile=File(...)):
+        with closing(connect()) as c:subject(c,subject_id)
+        with TemporaryDirectory(prefix='pdf-',dir=root) as temp:
+            temp=Path(temp);source=temp/'source.pdf';output=temp/'figures';output.mkdir();size=0
+            with source.open('wb') as target:
+                for chunk in iter(lambda:file.file.read(1024**2),b''):
+                    size+=len(chunk)
+                    if size>50*1024**2:raise HTTPException(413,'PDF exceeds 50 MiB')
+                    target.write(chunk)
+            with source.open('rb') as probe:
+                if probe.read(5)!=b'%PDF-':raise HTTPException(422,'Choose a valid PDF')
+            command=([sys.executable,'--internal-pdf'] if getattr(sys,'frozen',False) else [sys.executable,'-m','aulalocale.pdf_import'])+['--input',str(source),'--output',str(output)]
+            try:
+                with (temp/'worker.log').open('w') as log:subprocess.run(command,stdout=log,stderr=log,timeout=45,check=True)
+                result=json.loads((output/'result.json').read_text())
+            except (subprocess.SubprocessError,OSError,ValueError) as error:raise HTTPException(422,'Unable to extract PDF figures: use an unencrypted PDF up to 200 pages, 100 images and 20 megapixels per image') from error
+            directory=root/'materials';directory.mkdir(exist_ok=True);created=[];records=[]
+            original_name=(file.filename or 'slides.pdf').replace('\\','/').rsplit('/',1)[-1][:150]
+            with worker.lock:
+                try:
+                    with closing(connect()) as c,c:
+                        for figure in result['figures']:
+                            identifier=str(uuid4());filename=identifier+'.png';target=directory/filename
+                            shutil.copyfile(output/figure['filename'],target);created.append(target)
+                            caption=f"{original_name} · page {figure['page']} · image {len(records)+1}"
+                            c.execute('INSERT INTO materials VALUES (?,?,?,?,?,?)',(identifier,str(subject_id),caption,filename,figure['width'],figure['height']))
+                            records.append({'id':identifier,'caption':caption,'page':figure['page']})
+                except Exception:
+                    for path in created:path.unlink(missing_ok=True)
+                    raise
+            return {'materials':records,'page_count':result['page_count'],'warnings':result['warnings'],'source_sha256':result['sha256'],'original_pdf_stored':False}
 
     @router.post('/subjects/{subject_id}/materials/outline',status_code=201)
     def outline(subject_id:UUID,options:OutlineInput):
@@ -99,6 +134,23 @@ def materials_router(root,connect,authenticate,worker):
         except Exception:
             target.unlink(missing_ok=True);raise
         return {'id':identifier,'subject_id':str(subject_id),'caption':caption,'width':width,'height':height}
+
+    @router.post('/subjects/{subject_id}/materials/source-map',status_code=201)
+    def source_map(subject_id:UUID,options:OutlineInput,language:str='en'):
+        from .study import latest_notes
+        from .source_map import draw
+        if language not in ('en','it'):raise HTTPException(422,'Unsupported diagram language')
+        with closing(connect()) as c:
+            subject(c,subject_id);notes=latest_notes(c,subject_id)
+            titles={r['id']:r['title'] for r in c.execute('SELECT id,title FROM lessons WHERE subject_id=?',(str(subject_id),))}
+        if not notes or notes['id']!=str(options.base_revision):raise HTTPException(409,'Current note revision required')
+        directory=root/'materials';directory.mkdir(exist_ok=True);identifier=str(uuid4());filename=identifier+'.png';target=directory/filename
+        try:
+            width,height=draw(notes,titles,target,language)
+            caption='Source map · citations, not causal links · revision '+notes['id']
+            with closing(connect()) as c,c:c.execute('INSERT INTO materials VALUES (?,?,?,?,?,?)',(identifier,str(subject_id),caption,filename,width,height))
+        except Exception:target.unlink(missing_ok=True);raise
+        return {'id':identifier,'caption':caption,'source_revision':notes['id']}
 
     @router.get('/subjects/{subject_id}/materials')
     def materials(subject_id:UUID):
@@ -162,8 +214,11 @@ def materials_router(root,connect,authenticate,worker):
                         voice_jobs=[r[0] for r in c.execute("SELECT id FROM study_jobs WHERE kind='speakers' AND status='completed'")]
                         names+=['speakers/'+identifier+'.json' for identifier in voice_jobs]
                         names+=['speakers/'+identifier+'.edits.json' for identifier in voice_jobs if (root/'speakers'/(identifier+'.edits.json')).is_file()]
+                        evidence_jobs=[r[0] for r in c.execute("SELECT id FROM study_jobs WHERE kind='evidence' AND status='completed'")]
+                        names+=['evidence/'+identifier+'.json' for identifier in evidence_jobs]
                     entries={'aulalocale.sqlite3':snapshot,**{name:root/name for name in names}}
-                    manifest={'schema':5,'files':{}}
+                    from . import ARCHIVE_SCHEMA
+                    manifest={'schema':ARCHIVE_SCHEMA,'files':{}}
                     with zipfile.ZipFile(path,'w',compression=zipfile.ZIP_STORED) as bundle:
                         for name,file in entries.items():
                             if not file.is_file():raise ValueError('An archived file is missing; backup aborted')

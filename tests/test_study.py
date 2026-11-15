@@ -200,3 +200,21 @@ def test_notes_output_language_is_validated_and_reaches_generation(tmp_path,monk
         assert proposal['chapters'][0]['generation']['language']=='en'
         assert proposal['chapters'][0]['text']=='The receptor binds the drug.'
         assert any('in inglese' in prompt for prompt in prompts)
+
+
+def test_note_history_is_accepted_only_scoped_and_immutable(tmp_path):
+    sid,_,_,_=seeded(tmp_path);old,new,proposal,chapter=map(str,[uuid4(),uuid4(),uuid4(),uuid4()])
+    chapters=[{'id':chapter,'title':'Before','text':'Original manual text','sources':[],'manual':True}]
+    with sqlite3.connect(tmp_path/'aulalocale.sqlite3') as c:
+        for identifier,parent,accepted,when in [(old,None,1,'2026-01-01'),(new,old,1,'2026-01-02'),(proposal,new,0,'2026-01-03')]:c.execute('INSERT INTO notes VALUES (?,?,?,?,?,?)',(identifier,sid,parent,json.dumps(chapters),accepted,when))
+    with TestClient(create_app(tmp_path,TOKEN)) as client:
+        path=f'/api/v1/subjects/{sid}/notes/revisions'
+        assert client.get(path).status_code==401
+        assert [r['id'] for r in client.get(path,headers=AUTH).json()]==[new,old]
+        assert client.get(path+'?limit=1&offset=1',headers=AUTH).json()[0]['id']==old
+        assert client.get(path+'/'+proposal,headers=AUTH).status_code==404
+        other=client.post('/api/v1/subjects',headers=AUTH,json={'title':'Other'}).json()['id']
+        assert client.get(f'/api/v1/subjects/{other}/notes/revisions/{old}',headers=AUTH).status_code==404
+        edit={'base_revision':old,'chapter_id':chapter,'title':'Overwrite','text':'No'}
+        assert client.put(f'/api/v1/subjects/{sid}/notes',headers=AUTH,json=edit).status_code==409
+        assert client.get(path+'/'+old,headers=AUTH).json()['chapters']==chapters

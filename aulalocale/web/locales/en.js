@@ -1,4 +1,3 @@
-/* English interface catalog. Keys are Italian source messages. */
 window.TracciaLocales = {
   "en": {
     "Traccia — le tue lezioni": "Traccia — your lectures",
@@ -21,7 +20,7 @@ window.TracciaLocales = {
     "Esci": "Sign out",
     "Chiudi app": "Quit app",
     "LA TUA BIBLIOTECA": "YOUR LIBRARY",
-    "Anteprima · 0.10": "Preview · 0.10",
+    "Anteprima · 0.11-dev": "Preview · 0.11-dev",
     "Il tuo spazio di studio": "Your study space",
     "Una materia alla volta, una lezione dopo l’altra.": "One subject at a time, one lecture after another.",
     "● Registra": "● Record",
@@ -294,6 +293,30 @@ window.TracciaLocales = {
     "Lingua delle nuove sezioni": "Language for new sections",
     "GTCRN · pulizia voce IA": "GTCRN · AI voice cleanup",
     "Analisi parlanti · segmentazione": "Speaker analysis · segmentation",
-    "Isolamento docente · modello principale": "Lecturer isolation · main model"
+    "Isolamento docente · modello principale": "Lecturer isolation · main model",
+    "Cronologia della dispensa": "Course note history",
+    "Attuale": "Current",
+    "Revisione storica in sola lettura. Esportazione e nuove proposte usano la versione attuale.": "Read-only historical revision. Export and new proposals use the current version.",
+    "Anteprima della pulizia": "Preview audio cleanup",
+    "Confronta un intervallo prima di elaborare tutta la lezione. Le anteprime non sono usate per trascrivere.": "Compare a short interval before processing the entire lecture. Previews are not used for transcription.",
+    "Inizio (secondi)": "Start (seconds)",
+    "Fine (secondi)": "End (seconds)",
+    "Prepara anteprima": "Prepare preview",
+    "Ascolta intervallo originale": "Play original interval",
+    "Anteprima pronta. Confronta originale e migliorato.": "Preview ready. Compare the original and enhanced versions.",
+    "Le anteprime supportano GTCRN e filtri tradizionali.": "Previews support GTCRN and traditional filters.",
+    "Controlla citazioni con IA locale": "Review citations with local AI",
+    "Controllo locale in corso…": "Local review in progress…",
+    "Controllo assistito dal modello, non una certificazione. Verifica le citazioni e le quantità.": "Model-assisted review, not a certification. Check the quotations and quantities.",
+    "Supporto proposto": "Proposed support",
+    "Non supportato": "Unsupported",
+    "Da verificare": "Needs review",
+    "Alcune frasi non sono state controllate: limite di otto frasi per verifica.": "Some sentences were not checked: a maximum of eight sentences per review.",
+    "Estrai figure da PDF": "Extract PDF figures",
+    "Il PDF originale non viene archiviato. Conserva le slide; le figure mantengono pagina e impronta del documento.": "The original PDF is not archived. Keep your slides; extracted figures retain the page and document fingerprint.",
+    "Figure estratte: {{0}}. Avvisi: {{1}}.": "Figures extracted: {{0}}. Warnings: {{1}}.",
+    "Genera schema con fonti": "Generate source-linked diagram",
+    "Integrità archivio": "Archive health",
+    "Questo controllo non modifica i file. Gli originali non vengono mai spostati automaticamente.": "This check does not change files. Original recordings are never moved automatically."
   }
 };

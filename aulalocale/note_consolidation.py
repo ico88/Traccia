@@ -39,10 +39,21 @@ def ref_key(ref):return (ref['lesson_id'],ref['revision_id'],ref['segment_id'])
 
 
 def candidates(chapters,incoming):
-    def words(text):return set(re.findall(r'\w{4,}',text.casefold()))-{'della','delle','degli','nella','nelle','sono','come','questo','questa'}
-    wanted=words(incoming['title']+' '+incoming['text'])
+    # BM25-style retrieval weights uncommon topic words and chapter titles.
+    # It bounds the local model context; it is not a semantic similarity certificate.
+    from collections import Counter
+    import math,unicodedata
+    stop={'della','delle','degli','nella','nelle','sono','come','questo','questa','the','and','that','with','from','this','these','those','for','del','dei','per','una','uno'}
+    def words(text):
+        text=''.join(c for c in unicodedata.normalize('NFKD',text.casefold()) if not unicodedata.combining(c))
+        return [w for w in re.findall(r'\w{3,}',text) if w not in stop]
     options=[(i,c) for i,c in enumerate(chapters) if not c.get('manual') and len(c['text'])+len(incoming['text'])<=3500]
-    return sorted(options,key=lambda item:len(wanted & words(item[1]['title']+' '+item[1]['text'])),reverse=True)[:12]
+    if not options:return []
+    docs=[Counter(words(c['title'])*3+words(c['text'])) for _,c in options];query=set(words(incoming['title'])*3+words(incoming['text']));average=sum(sum(d.values()) for d in docs)/len(docs) or 1
+    frequency=Counter(word for d in docs for word in d)
+    def rank(index):
+        d=docs[index];length=sum(d.values());return sum(math.log(1+(len(docs)-frequency[w]+.5)/(frequency[w]+.5))*d[w]*2.2/(d[w]+1.2*(.25+.75*length/average)) for w in query if d[w])
+    return [options[i] for i in sorted(range(len(options)),key=rank,reverse=True)[:12]]
 
 
 def consolidate(chapters,incoming,ask,source_text):

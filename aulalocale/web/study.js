@@ -4,7 +4,7 @@ let transcriptPage = 0, historicalTranscript = false, transcriptHead = null;
 const TRANSCRIPT_PAGE_SIZE = 40;
 let reviewCursor=null, previewRange=null, transcriptSaving=false;
 let activeStudyJob = null, activeView = 'library', notesTimer = null, modelsTimer = null;
-let currentNotes = null, editingChapter = null;
+let currentNotes = null, editingChapter = null, historicalNotes=null;
 function mayLeaveTranscript() { return (!transcriptDirty && !window.aulalocaleSpeakersDirty) || window.confirm(T('Ci sono correzioni non salvate. Vuoi abbandonarle?')); }
 const readableTime = seconds => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2,'0')}`;
 function resetStudy() {
@@ -139,7 +139,7 @@ async function openSource(ref){
   if(currentTranscript){const index=currentTranscript.segments.findIndex(s=>s.id===ref.segment_id);if(index>=0){transcriptPage=Math.floor(index/TRANSCRIPT_PAGE_SIZE);renderTranscript();}}
   seekTo(ref.start);$('player-panel').scrollIntoView({behavior:'smooth',block:'start'});
 }
-function renderChapter(chapter,editable,allChapters=currentNotes?.chapters || []){
+function renderChapter(chapter,editable,allChapters=currentNotes?.chapters || [],revision=currentNotes?.id){
   const card=document.createElement('article');card.className='chapter-card';card.dataset.chapterId=chapter.id;
   const heading=document.createElement('div');heading.className='chapter-heading';const title=document.createElement('h3');title.textContent=chapter.title;heading.append(title);
   if(editable){const button=document.createElement('button');button.className='text-button';button.textContent=chapter.manual?T('Modifica · protetta'):T('Modifica');button.onclick=()=>{editingChapter=chapter;$('chapter-title').value=chapter.title;$('chapter-text').value=chapter.text;$('chapter-dialog').showModal();};heading.append(button);}
@@ -147,14 +147,21 @@ function renderChapter(chapter,editable,allChapters=currentNotes?.chapters || []
   const sources=document.createElement('div');sources.className='sources';
   for(const ref of chapter.sources){const link=document.createElement('button');link.className='source-link';link.textContent=T`↗ ${readableTime(ref.start)} · fonte`;link.title=(lessons.find(l=>l.id===ref.lesson_id)||{}).title||T('Lezione');link.onclick=()=>openSource(ref).catch(e=>notify(e.message,true));const printed=document.createElement('span');printed.className='print-citation';printed.textContent=T`Fonte: ${(lessons.find(l=>l.id===ref.lesson_id)||{}).title||ref.lesson_id}, ${readableTime(ref.start)} · revisione ${ref.revision_id}`;sources.append(link,printed);}
   card.append(heading,text,sources);
+  if(revision && chapter.sources.length){const check=document.createElement('button'),output=document.createElement('div');output.className='evidence-output';check.className='text-button';check.textContent=T('Controlla citazioni con IA locale');check.onclick=()=>checkEvidence(revision,chapter.id,check,output).catch(e=>{check.disabled=false;output.textContent=e.message;notify(e.message,true);});card.append(check,output);}
   if(chapter.possible_conflict_with){const warning=document.createElement('p');warning.className='conflict-notice';const other=allChapters.find(c=>c.id===chapter.possible_conflict_with);warning.textContent=T`Possibile contrasto${other?T(' con “')+other.title+'”':''}: confronta entrambe le fonti. Nessuna versione è stata scelta automaticamente.`;if(other){const jump=document.createElement('button');jump.className='text-button';jump.textContent=T('Vai alla sezione da confrontare');jump.onclick=()=>card.parentElement.querySelector(`[data-chapter-id="${other.id}"]`)?.scrollIntoView({behavior:'smooth',block:'center'});warning.append(jump);}card.append(warning);}
 if(chapter.reviewed_at || chapter.manual){const state=document.createElement('p');state.className='small';state.textContent=chapter.manual?T('Sezione modificata manualmente · protetta'):T('Sezione controllata dallo studente');card.append(state);}return card;
 }
 async function loadNotes(){
   clearTimeout(notesTimer);if(!selected){$('notes-status').textContent=T('Crea o scegli una materia per iniziare.');return;}
   const id=selected,result=await request(`/api/v1/subjects/${id}/notes`);if(selected!==id || activeView!=='notes')return;
-  currentNotes=result.current;$('generate-outline').hidden=!currentNotes;$('notes-content').replaceChildren();$('notes-proposals').replaceChildren();
-  const active=result.jobs.find(job=>['queued','running','interrupted'].includes(job.status));
+  if(historicalNotes?.subject_id!==id || historicalNotes?.id===result.current?.id)historicalNotes=null;
+  const revisions=await allPages(`/api/v1/subjects/${id}/notes/revisions`);if(selected!==id || activeView!=='notes')return;
+  $('notes-history').replaceChildren();$('notes-history').disabled=!revisions.length;
+  for(const [revisionIndex,revision] of revisions.entries()){const option=document.createElement('option');option.value=revision.id;option.textContent=(revisions.length-revisionIndex)+' · '+new Date(revision.created_at).toLocaleString(I18n.locale)+(revision.id===result.current?.id?' · '+T('Attuale'):'');$('notes-history').append(option);}
+  currentNotes=historicalNotes || result.current;$('notes-history').value=currentNotes?.id || '';
+  $('notes-history-status').textContent=historicalNotes?T('Revisione storica in sola lettura. Esportazione e nuove proposte usano la versione attuale.'):'';
+  $('generate-source-map').hidden=!currentNotes || Boolean(historicalNotes);$('generate-outline').hidden=!currentNotes || Boolean(historicalNotes);$('notes-content').replaceChildren();$('notes-proposals').replaceChildren();
+  const active=result.jobs.find(job=>job.kind==='notes' && ['queued','running','interrupted'].includes(job.status));
   $('generate-notes').disabled=Boolean(active);
   $('notes-status').textContent=active?T`Aggiornamento in preparazione · ${Math.floor(active.progress)}%`:result.current && result.current.stale?T('Alcune fonti sono cambiate. Prepara un aggiornamento e controlla i riferimenti.'):!currentNotes?T('Trascrivi una lezione, poi prepara la prima proposta.'):T`Dispensa salvata · ${new Date(currentNotes.created_at).toLocaleString(I18n.locale)}`;
   if(!active && result.jobs[0] && result.jobs[0].status==='failed')$('notes-status').textContent=result.jobs[0].error;
@@ -168,19 +175,19 @@ async function loadNotes(){
     const update=()=>{button.textContent=proposal.blocking_stale?T('Fonti cambiate · rigenera'):T('Accetta sezioni controllate');button.disabled=proposal.blocking_stale || checked.size!==required.length || removedChecked.size!==removed.length;progress.textContent=T`${checked.size} di ${required.length} sezioni nuove o aggiornate controllate${removed.length?T` · ${removedChecked.size} di ${removed.length} sostituzioni controllate`:''}. Confronta il testo con le fonti prima di confermare.`;};update();
     button.onclick=async()=>{button.disabled=true;try{await request(`/api/v1/subjects/${id}/notes/${proposal.id}/accept`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reviewed_chapter_ids:[...checked],reviewed_removed_chapter_ids:[...removedChecked]})});await loadNotes();}catch(e){notify(e.message,true);update();}};
     box.append(title,description);
-    for(const chapter of proposal.chapters){const card=renderChapter(chapter,false,proposal.chapters),change=changeMap.get(chapter.id);const state=document.createElement('p');state.className='change-label';state.textContent=({added:T('Nuova sezione'),updated:T('Sezione aggiornata'),unchanged:T('Invariata'),protected:T('Correzioni manuali conservate')})[change?.kind] || T('Sezione da controllare');card.prepend(state);
+    for(const chapter of proposal.chapters){const card=renderChapter(chapter,false,proposal.chapters,proposal.id),change=changeMap.get(chapter.id);const state=document.createElement('p');state.className='change-label';state.textContent=({added:T('Nuova sezione'),updated:T('Sezione aggiornata'),unchanged:T('Invariata'),protected:T('Correzioni manuali conservate')})[change?.kind] || T('Sezione da controllare');card.prepend(state);
       if(change?.previous){const before=document.createElement('details'),summary=document.createElement('summary'),text=document.createElement('p');summary.textContent=T('Confronta con la versione attuale');text.className='chapter-text';text.textContent=change.previous.title+'\n\n'+change.previous.text;before.append(summary,text);card.append(before);}
       if(required.some(c=>c.id===chapter.id)){const label=document.createElement('label');label.className='chapter-review';const check=document.createElement('input');check.type='checkbox';check.setAttribute('aria-label',T`Ho controllato la sezione ${chapter.title} e i riferimenti`);check.onchange=()=>{check.checked?checked.add(chapter.id):checked.delete(chapter.id);update();};label.append(check,document.createTextNode(T('Ho controllato questa sezione e i riferimenti')));card.append(label);}box.append(card);}
     if(removed.length){const list=document.createElement('section');list.className='replaced-chapters';const heading=document.createElement('h4');heading.textContent=T('Sezioni precedenti che verranno sostituite');list.append(heading);for(const item of removed){const label=document.createElement('label');label.className='chapter-review';const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.onchange=()=>{checkbox.checked?removedChecked.add(item.chapter_id):removedChecked.delete(item.chapter_id);update();};label.append(checkbox,document.createTextNode(T('Ho controllato la sostituzione di: ')+item.title));list.append(label);}box.append(list);}
     box.append(progress,button);$('notes-proposals').append(box);
   }
-  if(currentNotes)for(const chapter of currentNotes.chapters)$('notes-content').append(renderChapter(chapter,true));
+  if(currentNotes)for(const chapter of currentNotes.chapters)$('notes-content').append(renderChapter(chapter,!historicalNotes));
   $('export-notes').hidden=!currentNotes;$('export-notes').href=`/api/v1/subjects/${id}/notes/export`;$('export-notes').textContent=T('Esporta Markdown ↗');$('print-notes').hidden=!currentNotes;$('export-study').hidden=!currentNotes;$('export-study').href=`/api/v1/subjects/${id}/study-export`;
   await loadMaterials(id);
   if(active)notesTimer=setTimeout(()=>loadNotes().catch(e=>notify(e.message,true)),2000);
 }
 $('generate-notes').onclick=async()=>{if(!selected)return;$('generate-notes').disabled=true;try{await request(`/api/v1/subjects/${selected}/notes/generate?language=${$('notes-language').value}`,{method:'POST'});await loadNotes();}catch(e){notify(e.message,true);$('generate-notes').disabled=false;}};
-$('chapter-form').onsubmit=async event=>{event.preventDefault();if(!currentNotes || !editingChapter)return;const button=event.submitter;button.disabled=true;try{await request(`/api/v1/subjects/${selected}/notes`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({base_revision:currentNotes.id,chapter_id:editingChapter.id,title:$('chapter-title').value,text:$('chapter-text').value})});$('chapter-dialog').close();await loadNotes();}catch(e){notify(e.message,true);}finally{button.disabled=false;}};
+$('chapter-form').onsubmit=async event=>{event.preventDefault();if(!currentNotes || !editingChapter || historicalNotes)return;const button=event.submitter;button.disabled=true;try{await request(`/api/v1/subjects/${selected}/notes`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({base_revision:currentNotes.id,chapter_id:editingChapter.id,title:$('chapter-title').value,text:$('chapter-text').value})});$('chapter-dialog').close();await loadNotes();}catch(e){notify(e.message,true);}finally{button.disabled=false;}};
 $('print-notes').onclick=()=>window.print();
 window.addEventListener('beforeunload',event=>{if(transcriptDirty){event.preventDefault();event.returnValue='';}});
 
@@ -222,3 +229,28 @@ $('next-unreviewed').onclick=()=>{
   const filtered=visibleSegments();transcriptPage=Math.floor(filtered.findIndex(s=>s.id===next.id)/TRANSCRIPT_PAGE_SIZE);renderTranscript();seekTo(next.start);
   const field=document.querySelector(`.transcript-segment[data-start="${next.start}"] textarea`);if(field){field.focus();field.scrollIntoView({block:'nearest'});}
 };
+
+$('notes-history').onchange=async()=>{if(!selected)return;const id=selected,revision=$('notes-history').value;try{const result=await request(`/api/v1/subjects/${id}/notes/revisions/${revision}`);if(selected!==id)return;historicalNotes=result;await loadNotes();}catch(e){notify(e.message,true);}};
+
+async function checkEvidence(revision,chapterId,button,output){
+  const subjectId=selected;button.disabled=true;output.textContent=T('Controllo locale in corso…');
+  let job=await request(`/api/v1/subjects/${subjectId}/notes/${revision}/chapters/${chapterId}/evidence-check`,{method:'POST'});
+  const cancel=document.createElement('button');cancel.className='text-button';cancel.textContent=T('Annulla');cancel.onclick=async()=>{cancel.disabled=true;try{await request(`/api/v1/study-jobs/${job.id}/cancel`,{method:'POST'});}catch(e){notify(e.message,true);cancel.disabled=false;}};output.append(cancel);
+  while(['queued','running','interrupted'].includes(job.status)){await new Promise(resolve=>setTimeout(resolve,1200));if(!button.isConnected || selected!==subjectId)return;job=await request(`/api/v1/study-jobs/${job.id}`);}
+  if(!button.isConnected || selected!==subjectId)return;
+  button.disabled=false;if(job.status!=='completed'){output.textContent=job.error || job.status;return;}
+  const result=await request(`/api/v1/study-jobs/${job.id}/evidence`);output.replaceChildren();
+  const notice=document.createElement('p');notice.className='small';notice.textContent=T('Controllo assistito dal modello, non una certificazione. Verifica le citazioni e le quantità.');output.append(notice);
+  for(const item of result.checks){const row=document.createElement('p');row.className='evidence-check';const claim=document.createElement('strong');claim.textContent=({supported:T('Supporto proposto'),unsupported:T('Non supportato'),uncertain:T('Da verificare')})[item.status]+': '+item.claim;row.append(claim);if(item.quote){const quote=document.createElement('blockquote');quote.textContent=item.quote;row.append(quote);}const reason=document.createElement('p');reason.className='small';reason.textContent=item.reason;row.append(reason);output.append(row);}
+  if(result.unreviewed_claims){const remainder=document.createElement('p');remainder.textContent=T('Alcune frasi non sono state controllate: limite di otto frasi per verifica.');output.append(remainder);}
+}
+
+$('pdf-file').onchange=async()=>{
+  const file=$('pdf-file').files[0];if(!file || !selected)return;const id=selected;
+  if(file.size>50*1024*1024){notify('PDF exceeds 50 MiB',true);return;}
+  $('pdf-file').disabled=true;const form=new FormData();form.append('file',file);
+  try{const result=await request(`/api/v1/subjects/${id}/materials/pdf`,{method:'POST',body:form});if(selected===id)await loadMaterials(id);notify(T`Figure estratte: ${result.materials.length}. Avvisi: ${result.warnings.length}.`);}catch(e){notify(e.message,true);}finally{$('pdf-file').disabled=false;$('pdf-file').value='';}
+};
+
+$('generate-source-map').onclick=async()=>{if(!selected || !currentNotes || historicalNotes)return;const id=selected;$('generate-source-map').disabled=true;try{await request(`/api/v1/subjects/${id}/materials/source-map?language=${I18n.language}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({base_revision:currentNotes.id})});if(selected===id)await loadMaterials(id);}catch(e){notify(e.message,true);}finally{$('generate-source-map').disabled=false;}};
+$('show-archive-health').onclick=async()=>{$('archive-health-dialog').showModal();$('archive-health-report').textContent=T('Caricamento…');try{const result=await request('/api/v1/archive-health');$('archive-health-report').textContent=JSON.stringify({missing:result.missing,orphan_derivatives:result.orphan_derivatives,unreferenced_originals:result.unreferenced_originals,unclassified:result.unclassified},null,2);}catch(e){$('archive-health-report').textContent=e.message;}};

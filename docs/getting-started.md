@@ -62,7 +62,7 @@ Images are validated and re-encoded to PNG, limited to 20 MiB and 20 megapixels.
 python -m aulalocale.restore /path/to/aulalocale-backup.zip --data /path/to/new-archive
 ```
 
-Restore checks paths, checksums, SQLite integrity and schema version. It requires a new destination and never overwrites an existing archive. Install models and runtimes separately. Interrupted processing restarts the phase; it does not resume at the exact sample/token.
+Restore checks paths, checksums, SQLite integrity and schema version. It requires a new destination and never overwrites an existing archive. Install models and runtimes separately. Interrupted processing in the same archive restarts the phase; it does not resume at the exact sample/token. In newly restored backups, pending jobs are cancelled and must be started explicitly.
 
 ## Development Mac package
 

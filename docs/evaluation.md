@@ -21,3 +21,5 @@ The output includes WAV comparisons, raw recognizer output, model/source hashes,
 On the development M4, three user-provided university recordings supplied nine distinct intervals, totaling 7.5 minutes of source audio. The run completed 24 condition results, including split-boundary comparisons. Median recognition real-time factor was 0.084; cumulative recognition wall time was 109.68 seconds, excluding preparation/denoising.
 
 No human-reviewed references were provided, so **zero WER/CER values are reported**. No subjective denoising score or semantic accuracy is claimed. Audio, hypotheses and source filenames remain private. Broader representative evaluation and human listening remain pending.
+
+The listening worksheet and post-hoc scorer are described in [0.11 evaluation tools](roadmap-0.11.md#human-review-and-scoring). All three source recordings retained their original SHA-256 after the trial.

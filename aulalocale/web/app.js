@@ -214,6 +214,7 @@ $('upload-form').onsubmit = async event => {
   finally { importing = false; $('audio-file').disabled = false; button.disabled = false; $('upload-status').textContent = T('L’originale sarà conservato senza modifiche.'); }
 };
 function resetAudioState() {
+  if(typeof resetPreview==='function')resetPreview();
   if (typeof resetStudy === 'function') resetStudy();
   currentLesson = null; currentAudioJob = null; audioSourceVersion++;
   $('audio-method').value='gtcrn'; $('audio-preset').value='balanced'; $('audio-gain').value='0';
@@ -248,7 +249,7 @@ async function refreshAudioJob() {
   const id = currentLesson.id, preset = $('audio-preset').value, method=$('audio-method').value,options=enhancementOptions();
   const jobs = await request(`/api/v1/lessons/${encodeURIComponent(id)}/enhancements`);
   if (!currentLesson || currentLesson.id !== id || $('audio-preset').value !== preset || $('audio-method').value !== method || JSON.stringify(enhancementOptions()) !== JSON.stringify(options)) return;
-  currentAudioJob = jobs.find(job => job.preset === preset && (job.method || 'traditional') === method && (job.gain_db || 0)===options.gain_db && (method!=='voxlock' || (()=>{try{const recipe=JSON.parse(job.filter);return recipe.reference_start===options.reference_start && recipe.reference_end===options.reference_end;}catch{return false;}})())) || null;
+  currentAudioJob = jobs.find(job => !job.preview && job.preset === preset && (job.method || 'traditional') === method && (job.gain_db || 0)===options.gain_db && (method!=='voxlock' || (()=>{try{const recipe=JSON.parse(job.filter);return recipe.reference_start===options.reference_start && recipe.reference_end===options.reference_end;}catch{return false;}})())) || null;
   renderAudioJob();
   if (currentAudioJob && ['queued','running','interrupted'].includes(currentAudioJob.status)) {
     audioPollTimer = setTimeout(() => refreshAudioJob().catch(e => notify(e.message,true)),1200);
@@ -274,7 +275,7 @@ async function switchAudio(improved, keepPosition = true, autoplay = null) {
 }
 async function openLesson(lesson, autoplay = false) {
   if (typeof mayLeaveTranscript === 'function' && !mayLeaveTranscript()) return false;
-  resetAudioState(); currentLesson = lesson; renderLessons();
+  resetAudioState(); currentLesson = lesson; $('preview-end').value=Math.min(20,lesson.duration_seconds); renderLessons();
   $('playing-title').textContent = lesson.title; $('player-panel').hidden = false;
   renderAudioJob(); switchAudio(false,false,autoplay);
   try { await refreshAudioJob(); await loadStudy();await loadSpeakers(); } catch(e) { notify(e.message,true); }

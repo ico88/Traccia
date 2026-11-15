@@ -7,6 +7,7 @@ import tempfile
 import subprocess
 import sys
 import plistlib
+import ast,re
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -14,6 +15,10 @@ ROOT=Path(__file__).resolve().parents[1]
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--output',type=Path,required=True);parser.add_argument('--dmg',action='store_true');args=parser.parse_args()
     if sys.platform!='darwin' or platform.machine()!='arm64':raise SystemExit('Build on an Apple Silicon Mac')
+    module=ast.parse((ROOT/'aulalocale'/'__init__.py').read_text())
+    version=next(ast.literal_eval(n.value) for n in module.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='__version__' for t in n.targets))
+    numeric=re.match(r'\d+\.\d+\.\d+',version).group()
+    major,minor,patch=map(int,numeric.split('.'));build_number=str(major*10000+minor*100+patch)
     output=args.output.resolve();output.mkdir(parents=True,exist_ok=True)
     binaries=[ROOT/'runtimes'/name for name in ['whisper-cli','llama-cli','ffmpeg']]
     if not all(path.is_file() for path in binaries):raise SystemExit('Run scripts/setup_runtimes.py first')
@@ -22,7 +27,7 @@ def main():
              '--additional-hooks-dir',str(ROOT/'scripts'/'hooks'),'--specpath',str(ROOT/'work'),'--paths',str(ROOT),
              '--hidden-import','webview.platforms.cocoa','--hidden-import','WebKit','--hidden-import','AppKit','--hidden-import','Foundation','--collect-all','webview','--collect-all','mutagen','--collect-all','sherpa_onnx','--collect-all','uvicorn',
              '--add-data',f'{ROOT / "aulalocale" / "web"}:aulalocale/web']
-    for dependency in ['mutagen','imageio-ffmpeg','Pillow','fastapi','uvicorn','starlette','pydantic','certifi','numpy','sherpa-onnx','sherpa-onnx-core','pywebview','pyobjc-core','pyobjc-framework-Cocoa','pyobjc-framework-WebKit']:
+    for dependency in ['mutagen','imageio-ffmpeg','Pillow','fastapi','uvicorn','starlette','pydantic','certifi','numpy','sherpa-onnx','sherpa-onnx-core','pywebview','pyobjc-core','pyobjc-framework-Cocoa','pyobjc-framework-WebKit','pypdf']:
         command+=['--copy-metadata',dependency]
     if (ROOT/'runtimes'/'licenses').is_dir():command+=['--add-data',f'{ROOT / "runtimes" / "licenses"}:runtimes/licenses']
     for binary in binaries:command+=['--add-binary',f'{binary}:runtimes']
@@ -32,7 +37,7 @@ def main():
     subprocess.run(command,check=True)
     bundle=output/'Traccia.app'
     info=bundle/'Contents'/'Info.plist'
-    data=plistlib.loads(info.read_bytes());data.update({'CFBundleShortVersionString':'0.10.0','CFBundleVersion':'11','CFBundleDisplayName':'Traccia','NSMicrophoneUsageDescription':'Traccia usa il microfono solo quando avvii una registrazione della lezione. L’audio resta sul tuo dispositivo.','NSHighResolutionCapable':True,'NSAppTransportSecurity':{'NSAllowsLocalNetworking':True}})
+    data=plistlib.loads(info.read_bytes());data.update({'CFBundleShortVersionString':numeric,'CFBundleVersion':build_number,'CFBundleDisplayName':'Traccia','NSMicrophoneUsageDescription':'Traccia usa il microfono solo quando avvii una registrazione della lezione. L’audio resta sul tuo dispositivo.','NSHighResolutionCapable':True,'NSAppTransportSecurity':{'NSAllowsLocalNetworking':True}})
     info.write_bytes(plistlib.dumps(data))
     # Finder/iCloud may reattach these two packaging attributes while signing.
     # Retry only that specific error; never clear quarantine or bypass verification.
@@ -51,8 +56,8 @@ def main():
             stage=Path(temporary)
             shutil.copytree(bundle,stage/'Traccia.app',symlinks=True)
             (stage/'Applicazioni').symlink_to('/Applications')
-            (stage/'LEGGIMI.txt').write_text('Traccia 0.10 - build di sviluppo Apple Silicon.\nTrascina Traccia in Applicazioni e avviala. I modelli si scaricano dalla schermata Modelli locali.\nBuild ad hoc non notarizzata, destinata ai test locali. Nessuna registrazione inclusa.\nSorgenti: https://github.com/ico88/Traccia/tree/sviluppo\n')
-            subprocess.run(['hdiutil','create','-ov','-volname','Traccia','-srcfolder',str(stage),'-format','UDZO',str(output/'Traccia-0.10-AppleSilicon-sviluppo.dmg')],check=True)
+            (stage/'LEGGIMI.txt').write_text(f'Traccia {version} - build di sviluppo Apple Silicon.\nTrascina Traccia in Applicazioni e avviala. I modelli si scaricano dalla schermata Modelli locali.\nBuild ad hoc non notarizzata, destinata ai test locali. Nessuna registrazione inclusa.\nSorgenti: https://github.com/ico88/Traccia/tree/sviluppo\n')
+            subprocess.run(['hdiutil','create','-ov','-volname','Traccia','-srcfolder',str(stage),'-format','UDZO',str(output/f'Traccia-{version}-AppleSilicon-sviluppo.dmg')],check=True)
     if (output/'Traccia').is_dir():shutil.rmtree(output/'Traccia')
     print('Development .app built. Distribution signing and notarization are not included.')
 

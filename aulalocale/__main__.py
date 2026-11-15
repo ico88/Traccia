@@ -16,12 +16,13 @@ from aulalocale.preferences import DesktopPreferences
 
 
 def main():
-    internal=next((flag for flag in ['--internal-denoise','--internal-speakers'] if flag in sys.argv),None)
+    internal=next((flag for flag in ['--internal-denoise','--internal-speakers','--internal-pdf'] if flag in sys.argv),None)
     if internal:
         if sys.stdout is None:sys.stdout=open(1,'w',buffering=1,closefd=False)
         if sys.stderr is None:sys.stderr=open(2,'w',buffering=1,closefd=False)
         if internal=='--internal-denoise':from aulalocale.ai_denoise import main as run_worker
-        else:from aulalocale.ai_speakers import main as run_worker
+        elif internal=='--internal-speakers':from aulalocale.ai_speakers import main as run_worker
+        else:from aulalocale.pdf_import import main as run_worker
         run_worker(sys.argv[sys.argv.index(internal)+1:])
         return
     parser=argparse.ArgumentParser(description='Traccia local desktop launcher')
