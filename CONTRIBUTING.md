@@ -1,9 +1,15 @@
-# Contribuire
+# Contributing to Traccia
 
-Lavorare su `sviluppo`. Eseguire `python -m pytest` prima del push e mantenere il README coerente con ciò che funziona realmente.
+Work against `sviluppo`, run `python -m pytest` for backend changes, and keep the documentation consistent with implemented behavior. Promotion of application code to `main` requires explicit approval from the project owner; do not enable auto-merge.
 
-Le pull request verso `main` devono descrivere comportamento, verifica e limiti. Il merge richiede conferma esplicita del responsabile del progetto; non attivare auto-merge. La protezione tecnica del branch non può verificare una conferma ricevuta in chat.
+Use synthetic fixtures. Never commit personal recordings, lecture transcripts, models, secrets or compiled runtimes. Do not add cloud inference APIs. Check model and dependency licenses before introducing them.
 
-Non aggiungere audio, trascrizioni personali, modelli, segreti o dataset senza autorizzazione. Usare campioni sintetici nei test. Non aggiungere API cloud di inferenza. Verificare le licenze prima di introdurre modelli e dipendenze.
+The code license has not been selected yet. Please agree substantial external contributions with the owner in advance.
 
-La licenza del progetto è ancora da definire: concordare preventivamente contributi esterni sostanziali.
+## Interface languages
+
+The interface currently supports English and Italian. Italian messages are source keys; `aulalocale/web/locales/en.js` contains English translations. `i18n.js` translates only explicitly marked interface text and calls to `T`. Never translate user-entered subjects, transcripts, filenames, captions or manually edited speaker names.
+
+Tagged template messages preserve numbered placeholders. Keep every placeholder exactly once where it is required. Add a catalog and a supported-language option to introduce another interface language; test reload, dialogs, empty states, errors and screen-reader labels. Language changes must preserve unsaved edits and ongoing recordings.
+
+Transcription language, new note-section language and interface language are independent. Do not silently translate existing notes when the interface changes.

@@ -11,6 +11,7 @@
 - Proposte di dispensa da trascrizioni, fonti, accettazione e protezione delle modifiche manuali.
 - Immagini della materia, mappe dei capitoli, esportazione e backup/ripristino.
 - Pulizia IA GTCRN, revisione guidata dei passaggi, confronto delle modifiche della dispensa e primo consolidamento incrementale per argomenti.
+- Interfaccia inglese/italiano, preferenza persistente e lingua separata per trascrizione e nuove sezioni della dispensa.
 - Finestra Mac WebKit, registrazione microfono con recupero bozze, ruoli dei parlanti, isolamento VoxLock sperimentale e guadagno selezionabile.
 - Script di build dei runtime e configurazione Docker.
 

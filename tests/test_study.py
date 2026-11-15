@@ -181,3 +181,22 @@ def test_transcription_uses_lossless_enhanced_source(tmp_path,monkeypatch):
         metadata=client.get(f'/api/v1/lessons/{lid}/transcript',headers=AUTH).json()['metadata']
         assert metadata['source']=='enhanced' and metadata['audio_job_id']==aid
         assert metadata['source_recipe']=='gtcrn-recipe'
+
+
+def test_notes_output_language_is_validated_and_reaches_generation(tmp_path,monkeypatch):
+    sid,_,_,_=seeded(tmp_path);enable_fake_llm(monkeypatch,tmp_path)
+    prompts=[]
+    def english(self,prompt,temp,identifier,citation_count=None,mode=None):
+        prompts.append(prompt)
+        if mode=='route':return {'target':0}
+        return {'chapters':[{'title':'Receptors','text':'The receptor binds the drug.','citations':[1]}]}
+    monkeypatch.setattr(StudyEngine,'llm',english)
+    with TestClient(create_app(tmp_path,TOKEN)) as client:
+        route=f'/api/v1/subjects/{sid}/notes/generate'
+        assert client.post(route+'?language=fr',headers=AUTH).status_code==422
+        response=client.post(route+'?language=en',headers=AUTH);assert response.status_code==202,response.text
+        assert wait(client,response.json()['id'])['status']=='completed'
+        proposal=client.get(f'/api/v1/subjects/{sid}/notes',headers=AUTH).json()['proposals'][0]
+        assert proposal['chapters'][0]['generation']['language']=='en'
+        assert proposal['chapters'][0]['text']=='The receptor binds the drug.'
+        assert any('in inglese' in prompt for prompt in prompts)

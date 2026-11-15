@@ -1,11 +1,11 @@
-# Traccia
+# Traccia visual identity
 
-Identità scelta per l’app: **Traccia**, con il motto **Ogni lezione lascia il segno.**
+**Traccia — Every lecture leaves a mark.**
 
-Il simbolo combina la lettera T con una forma d’onda. Colore principale terracotta `#A45438`, inchiostro `#763B29`, carta `#FAF8F4`. Il logo è vettoriale, senza dipendenze esterne; il wordmark usa il carattere di sistema Helvetica/Arial. L’icona Mac include margini trasparenti e tutte le risoluzioni standard.
+The symbol combines a T with an audio waveform. Terracotta `#A45438`, dark ink `#763B29`, warm paper `#FAF8F4`. The SVG logo has no external dependencies; the wordmark uses Helvetica/Arial system fonts. The Mac icon includes transparent optical margins and standard resolutions.
 
-- `../aulalocale/web/traccia-icon.svg`: simbolo vettoriale per l’interfaccia e favicon.
-- `traccia-wordmark.svg`: simbolo e nome per README e presentazioni.
-- `traccia-app-icon.png` / `Traccia.icns`: icona Mac.
+- `../aulalocale/web/traccia-icon.svg`: interface symbol and favicon.
+- `traccia-wordmark.svg`: wordmark for documentation.
+- `traccia-app-icon.png` / `Traccia.icns`: Mac application icon.
 
-Il nome è stato scelto dall’utente tra tre proposte. La scelta non costituisce verifica di disponibilità di marchio o dominio. Il repository e gli identificatori tecnici esistenti restano compatibili con AulaLocale, incluso il percorso dell’archivio e l’identificatore del bundle Mac.
+The name was chosen by the project owner; trademark and domain availability have not been verified. Technical package and archive identifiers remain compatible with the previous AulaLocale name.

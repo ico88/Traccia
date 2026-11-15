@@ -30,7 +30,7 @@ def main():
     subprocess.run(command,check=True)
     bundle=output/'Traccia.app'
     info=bundle/'Contents'/'Info.plist'
-    data=plistlib.loads(info.read_bytes());data.update({'CFBundleShortVersionString':'0.9.1','CFBundleVersion':'10','CFBundleDisplayName':'Traccia','NSMicrophoneUsageDescription':'Traccia usa il microfono solo quando avvii una registrazione della lezione. L’audio resta sul tuo dispositivo.','NSHighResolutionCapable':True,'NSAppTransportSecurity':{'NSAllowsLocalNetworking':True}})
+    data=plistlib.loads(info.read_bytes());data.update({'CFBundleShortVersionString':'0.10.0','CFBundleVersion':'11','CFBundleDisplayName':'Traccia','NSMicrophoneUsageDescription':'Traccia usa il microfono solo quando avvii una registrazione della lezione. L’audio resta sul tuo dispositivo.','NSHighResolutionCapable':True,'NSAppTransportSecurity':{'NSAllowsLocalNetworking':True}})
     info.write_bytes(plistlib.dumps(data))
     # Finder/iCloud may reattach these two packaging attributes while signing.
     # Retry only that specific error; never clear quarantine or bypass verification.
@@ -49,8 +49,8 @@ def main():
             stage=Path(temporary)
             shutil.copytree(bundle,stage/'Traccia.app',symlinks=True)
             (stage/'Applicazioni').symlink_to('/Applications')
-            (stage/'LEGGIMI.txt').write_text('Traccia 0.9.1 - build di sviluppo Apple Silicon.\nTrascina Traccia in Applicazioni e avviala. I modelli si scaricano dalla schermata Modelli locali.\nBuild ad hoc non notarizzata, destinata ai test locali. Nessuna registrazione inclusa.\nSorgenti: https://github.com/ico88/aulalocale/tree/sviluppo\n')
-            subprocess.run(['hdiutil','create','-ov','-volname','Traccia','-srcfolder',str(stage),'-format','UDZO',str(output/'Traccia-0.9.1-AppleSilicon-sviluppo.dmg')],check=True)
+            (stage/'LEGGIMI.txt').write_text('Traccia 0.10 - build di sviluppo Apple Silicon.\nTrascina Traccia in Applicazioni e avviala. I modelli si scaricano dalla schermata Modelli locali.\nBuild ad hoc non notarizzata, destinata ai test locali. Nessuna registrazione inclusa.\nSorgenti: https://github.com/ico88/Traccia/tree/sviluppo\n')
+            subprocess.run(['hdiutil','create','-ov','-volname','Traccia','-srcfolder',str(stage),'-format','UDZO',str(output/'Traccia-0.10-AppleSilicon-sviluppo.dmg')],check=True)
     if (output/'Traccia').is_dir():shutil.rmtree(output/'Traccia')
     print('Development .app built. Distribution signing and notarization are not included.')
 

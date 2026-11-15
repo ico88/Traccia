@@ -1,85 +1,65 @@
 <div align="center">
 
-<img src="docs/images/hero.svg" alt="Traccia — Ogni lezione lascia il segno. Registra, trascrivi e ritrova il filo del corso." width="100%">
+<img src="docs/images/hero.svg" alt="Traccia — Every lecture leaves a mark" width="100%">
 
-### Il tuo assistente per le lezioni universitarie. Sul tuo computer.
+### Turn your lectures into a study library. On your own computer.
 
-Audio più chiaro, trascrizioni con timestamp e dispense che crescono con il corso.
+Clearer audio. Searchable transcripts. Course notes that grow with each lecture.
 
-**[Inizia](#inizia-con-traccia)** · **[Funzioni](#cosa-puoi-fare)** · **[Documentazione](docs/getting-started.md)** · **[Roadmap](docs/roadmap.md)** · **[Segnala un problema](https://github.com/ico88/aulalocale/issues)**
+**[Get started](#get-started)** · **[Features](#from-recording-to-study-notes)** · **[Documentation](docs/getting-started.md)** · **[Roadmap](docs/roadmap.md)** · **[Issues](https://github.com/ico88/Traccia/issues)**
 
-[![Stato: anteprima](https://img.shields.io/badge/stato-anteprima_0.9.1-a45438?style=flat-square)](#stato-del-progetto)
-[![Mac: Apple Silicon](https://img.shields.io/badge/Mac-Apple_Silicon-332e2a?style=flat-square&logo=apple&logoColor=white)](#inizia-con-traccia)
-[![Inferenza: locale](https://img.shields.io/badge/inferenza-locale-85412c?style=flat-square)](#i-tuoi-audio-restano-tuoi)
-
-**Italiano** · [English](README.en.md)
+**English** · [Italiano](README.it.md)
 
 </div>
 
----
+Traccia is an experimental study app for university students. Organize recordings by subject, improve listening, transcribe lectures and prepare updates to your course notes, with references back to the source audio.
 
-Una cartella piena di registrazioni non è ancora materiale di studio. **Traccia riunisce il percorso che viene dopo la lezione**: organizza gli audio, migliora l’ascolto, trascrivi e costruisci la dispensa della materia, tornando alle fonti quando serve.
+Models run on your Mac or your own server. The standard workflow needs no account, inference API token or subscription. Internet is needed to install dependencies and download models; inference can then run offline.
 
-I modelli lavorano sul Mac o sul server che scegli tu. Nel percorso standard non servono account, abbonamenti o token di inferenza.
+> **Preview 0.10.** Current code lives on [`sviluppo`](https://github.com/ico88/Traccia/tree/sviluppo). AI output needs review. Development Mac builds are not notarized; no stable Mac download has been published in this repository yet.
 
-> **Anteprima 0.9.1 · sviluppo attivo.** Il codice aggiornato è nel ramo [`sviluppo`](https://github.com/ico88/aulalocale/tree/sviluppo). Le funzioni IA richiedono revisione; i pacchetti Mac di sviluppo non sono ancora notarizzati.
+![Traccia on Mac: subjects and lecture library](docs/images/library-en.png)
 
-<p align="center">
-  <img src="docs/images/library.png" alt="Finestra Mac di Traccia: materie nella barra laterale e lezioni organizzate nella biblioteca" width="100%">
-  <br><sub>La biblioteca di Traccia su Mac. Archivio dimostrativo con contenuti di esempio, senza lezioni personali.</sub>
-</p>
+*Real app screenshot with a fictional demo archive and synthetic silent recordings. No personal lecture data. This capture shows the English interface; Italian is also available.*
 
-## Cosa puoi fare
+## One app, more than one language
 
-| | Dal parlato al materiale di studio |
+Choose **English or Italian** for the interface; your preference is remembered on this device. Select **Italian, English or automatic detection** for transcription, and **English or Italian** for new course-note sections. These settings are independent: changing the interface never translates or rewrites your saved lectures. Some technical diagnostics and generated image labels still use their original language.
+
+## From recording to study notes
+
+| Feature | What you can do |
 |---|---|
-| **🎙️ Registra o trascina** | Importa MP3, WAV, M4A e FLAC oppure registra dal microfono, con pausa e recupero dei blocchi già salvati. Titolo, data e docente possono essere proposti dal nome del file e dai tag audio. |
-| **🎧 Riascolta meglio** | Riduci il rumore con GTCRN, regola il guadagno e confronta originale e versione migliorata dallo stesso punto. L’originale resta conservato. |
-| **✍️ Trascrivi e correggi** | Whisper Turbo genera testo con timestamp. Cerca un termine, riascolta il passaggio, correggilo e salva una nuova revisione. |
-| **📚 Fai crescere la dispensa** | Aggiungi una lezione alla materia e prepara una proposta di aggiornamento per argomento. Controlla le modifiche e i riferimenti prima di accettarla; le correzioni personali sono protette. |
-| **🔎 Torna alla fonte** | I riferimenti della dispensa collegano il testo ai passaggi delle lezioni. Le revisioni aiutano a conservare il contesto delle correzioni. |
-| **🖼️ Completa ed esporta** | Aggiungi immagini con didascalie, genera una mappa dei capitoli, esporta in Markdown o ZIP e stampa/salva in PDF. Backup e ripristino includono gli originali. |
+| Record or drop a file | Import MP3, WAV, M4A and FLAC, or record your microphone with pause and recovery of saved chunks. |
+| Improve listening | Reduce background noise with local GTCRN, adjust gain and compare the original and enhanced audio at the same position. |
+| Transcribe and review | Use Whisper Turbo with timestamps, search terms, replay passages and save corrections as separate revisions. |
+| Build course notes | Prepare topic-based updates from new lectures, inspect changes and sources, then approve each changed section. Manual edits stay protected. |
+| Add visual material | Attach images with captions and generate a chapter map. Export Markdown/ZIP or print to PDF. |
+| Keep your archive | Preserve original recordings and create verified backups including completed derivatives, images and speaker edits. |
 
-**Strumenti audio sperimentali:** distingui i parlanti e assegna i ruoli, oppure prova a isolare il docente con VoxLock usando 3–30 secondi della sua voce. La qualità dipende dalla registrazione: [funzionamento e limiti](docs/audio-desktop.md).
+**Experimental audio tools:** speaker analysis with editable roles, and VoxLock extraction using a 3–30 second sample of the lecturer’s voice. Accuracy, speed and listening quality depend on the recording. These tools do not guarantee clean separation or removal of reverberation.
 
-## Una materia, una dispensa che cresce
+Microphone recording is followed by transcription; live transcription is not implemented. Open recording drafts are not part of backups: finish and import them first.
 
-La lezione successiva aggiunge qualcosa al corso. Anche i tuoi appunti dovrebbero poterlo fare.
+## Notes that grow with the course
 
-1. **Aggiungi la lezione** alla materia e prepara la trascrizione.
-2. **Rivedi i passaggi** cercando i termini e tornando all’audio.
-3. **Prepara l’aggiornamento** della dispensa: Traccia propone integrazioni nei capitoli pertinenti e segnala possibili contrasti.
-4. **Scegli cosa conservare**: controlla le fonti e conferma ogni sezione nuova o aggiornata. I tuoi interventi manuali restano protetti.
+Add a lecture to a subject, review its transcript and prepare an update to the course notes. Traccia proposes additions to relevant chapters and flags possible conflicts. You review the sources and approve changed sections before accepting a proposal.
 
-<p align="center">
-  <img src="docs/images/notes.png" alt="Dispensa di esempio in Traccia, con capitoli, riferimenti all’audio e correzioni manuali protette" width="100%">
-  <br><sub>Schermata reale dell’app con testi dimostrativi inseriti manualmente. Non è un esempio di qualità della sintesi IA.</sub>
-</p>
+![Course notes with source links and protected manual edits](docs/images/notes-en.png)
 
-Il consolidamento tematico è sperimentale. Un riferimento permette di verificare la fonte, ma non certifica da solo la correttezza della sintesi. [Come funzionano le dispense →](docs/dynamic-notes.md)
+*Manually written demo text in the real app, not an example of AI summarization quality.*
 
-## I tuoi audio restano tuoi
+Topic consolidation is experimental. Source links make verification possible; they do not certify the correctness of generated text. [How it works →](docs/dynamic-notes.md)
 
-- **Inferenza sul tuo hardware.** Audio, trascrizioni e campioni vocali non vengono inviati a servizi IA esterni.
-- **Modelli a scelta.** Scarica soltanto quelli che ti servono da Hugging Face o dalle release ufficiali. Dopo il download puoi elaborare offline.
-- **Originali conservati.** Pulizia e isolamento creano derivati separati; correzioni e dispense usano revisioni.
-- **Archivio esportabile.** Backup ZIP verificato con SHA-256; ripristino in una nuova cartella.
+## Get started
 
-L’accesso a Internet serve per installare dipendenze e scaricare i modelli. Le bozze di registrazione ancora aperte non sono incluse nel backup: prima completale e salvale come lezioni.
+The reference development machine is an **Apple M4 with 24 GB unified memory**. Apple Silicon Macs use a dedicated WebKit window. Intel Macs are excluded; minimum requirements have not been certified.
 
-## Inizia con Traccia
-
-### Mac Apple Silicon
-
-L’app si apre in una **finestra Mac dedicata**, con icona e controlli propri. La modalità browser rimane disponibile per chi preferisce il servizio web.
-
-Per ora il percorso riproducibile pubblico è l’avvio da sorgenti: **non è ancora pubblicata una release Mac stabile scaricabile da questo repository**.
-
-Servono **Python 3.11+**, Git e i **Command Line Tools di Xcode** per compilare i runtime.
+Install **Python 3.11+**, Git and Xcode Command Line Tools, then:
 
 ```sh
-git clone --branch sviluppo https://github.com/ico88/aulalocale.git
-cd aulalocale
+git clone --branch sviluppo https://github.com/ico88/Traccia.git
+cd Traccia
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements-dev.txt
@@ -88,64 +68,32 @@ python scripts/setup_runtimes.py
 python -m aulalocale
 ```
 
-Al primo avvio crea una materia, apri **Modelli locali** e scarica i motori necessari. I pesi non vengono scaricati automaticamente. Per generare il pacchetto `.app` e il DMG, segui la [guida Mac](docs/getting-started.md#pacchetto-mac-di-sviluppo).
+Create a subject and open **Modelli locali** to download the models you need. Weights are not downloaded automatically. See the [installation guide](docs/getting-started.md) for Mac packaging, API mode and backup/restore.
 
-**Ambiente di riferimento:** Apple M4 con 24 GB di memoria unificata. Mac Intel esclusi; non sono ancora certificati requisiti minimi per altri dispositivi.
+**Own server:** a browser interface and Docker configuration are provided. Container builds, remote HTTPS access and performance on the target Intel i7 / 24 GB Linux server remain unverified. This preview supports one user per archive.
 
-### Server proprio
+## Local engines
 
-Puoi usare Traccia via interfaccia web, con elaborazione sul server. Sono predisposti Dockerfile e Docker Compose; **build container, accesso remoto HTTPS e prestazioni sull’i7 / 24 GB sono ancora da verificare**. Questa anteprima usa un archivio per singolo utilizzatore. [Configurazione e limiti →](docs/getting-started.md#server-proprio)
+| Engine | Purpose |
+|---|---|
+| Whisper Large v3 Turbo Q8 | Multilingual transcription; Italian is the priority test language |
+| GTCRN | Background noise reduction |
+| Qwen3 4B Q4_K_M | Course note proposals |
+| pyannote segmentation + 3D-Speaker | Experimental speaker analysis |
+| VoxLock | Experimental voice extraction |
 
-## I motori dietro Traccia
+Weights use pinned revisions and SHA-256 checksums. Downloads come from Hugging Face or official project releases; recordings and voice samples are not sent to inference services. A missing model does not trigger a cloud fallback. [Model catalog →](https://github.com/ico88/Traccia/blob/sviluppo/aulalocale/models.py)
 
-| Motore | A cosa serve | Download indicativo | Licenza dichiarata upstream |
-|---|---|---:|---|
-| [Whisper Large v3 Turbo Q8](https://huggingface.co/ggerganov/whisper.cpp) | Trascrizione multilingue, italiano prioritario | 874 MB | MIT |
-| [GTCRN](https://github.com/Xiaobin-Rong/gtcrn) | Riduzione del rumore | 523 KiB | MIT |
-| [Qwen3 4B Q4_K_M](https://huggingface.co/Qwen/Qwen3-4B-GGUF) | Proposte di dispensa | 2,50 GB | Apache-2.0 |
-| [pyannote + 3D-Speaker](https://github.com/k2-fsa/sherpa-onnx) | Analisi dei parlanti, sperimentale | 41 MB, due asset | MIT / Apache-2.0 |
-| [VoxLock](https://huggingface.co/arbazsiddiqui/voxlock) | Estrazione della voce, sperimentale | 73 MB compressi, due asset | Apache-2.0 |
+## Project status and contributions
 
-Revisioni e checksum dei pesi sono fissati nel [catalogo](aulalocale/models.py). L’inferenza usa whisper.cpp, llama.cpp e sherpa-onnx; FFmpeg gestisce conversione e controllo del volume. Un modello mancante non attiva un servizio cloud di ripiego.
+The documented checks include **backend regression tests** and real runtime trials on the M4. These are not an accuracy guarantee. Physical microphone access and permission behavior still need manual testing. [Verification →](docs/verification.md)
 
-## Stato del progetto
+Next priorities include evaluation on more real lectures, live transcription, extracting figures from slides/PDFs, generated illustrations, multiple users and signed/notarized Mac distribution. [Roadmap →](docs/roadmap.md)
 
-**Disponibile in `sviluppo`:** archivio, registrazione, pulizia IA, trascrizioni correggibili, proposte di dispense incrementali, immagini, esportazione e backup. Diarizzazione e isolamento della voce sono disponibili come strumenti sperimentali.
+Feedback on study workflows, reproducible issues and audio quality comparisons is welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before code contributions. Please do not upload private lectures, transcripts or tokens to issues. If the project is useful to you, a ⭐ helps others discover it.
 
-**Da completare:** qualificazione su più lezioni reali, trascrizione durante la registrazione, estrazione delle figure dalle slide/PDF, illustrazioni generative, multiutenza e distribuzione Mac firmata/notarizzata. [Roadmap completa →](docs/roadmap.md)
+**License:** the repository is public, but the project code license has not been selected yet. Substantial external contributions should be agreed in advance. Dependencies and models keep their own licenses; redistribution compatibility still needs review.
 
-Le verifiche documentate includono **82 test backend** e prove dei motori reali sul M4. I test non costituiscono una garanzia di accuratezza sul lessico del tuo corso. Microfono fisico e permessi richiedono ancora prova manuale. [Risultati e limiti →](docs/verification.md)
+**Compatibility:** the repository is now [`ico88/Traccia`](https://github.com/ico88/Traccia). GitHub redirects the previous `ico88/aulalocale` address. The Python module, environment variables, Mac bundle identifier and data locations retain their original identifiers so existing lectures do not need to be moved or reimported.
 
-## Partecipa
-
-Stiamo costruendo Traccia per chi studia ogni giorno tra lezioni, registrazioni e appunti. Sono utili feedback sul flusso di studio, segnalazioni riproducibili e confronti sulla qualità audio.
-
-- **Hai trovato un problema?** [Apri una issue](https://github.com/ico88/aulalocale/issues/new) indicando versione, dispositivo e passaggi per riprodurlo.
-- **Hai un’idea?** Racconta quale parte del tuo studio migliorerebbe, prima della soluzione tecnica.
-- **Vuoi contribuire al codice?** Leggi [CONTRIBUTING.md](CONTRIBUTING.md) e lavora su `sviluppo`. La licenza del progetto è ancora da scegliere: concordiamo prima i contributi esterni sostanziali.
-- **Ti interessa il progetto?** Una ⭐ aiuta altre persone a scoprirlo.
-
-Non pubblicare nelle issue registrazioni personali, trascrizioni delle lezioni, token o altri dati riservati.
-
-<details>
-<summary><strong>Documentazione, compatibilità e licenze</strong></summary>
-
-- [Installazione, API, backup e build Mac](docs/getting-started.md)
-- [Audio, registrazione e parlanti](docs/audio-desktop.md)
-- [Dispense dinamiche](docs/dynamic-notes.md) · [Architettura](docs/architecture.md)
-- [Confronti tra motori ASR](docs/model-selection.md) · [Verifiche](docs/verification.md)
-- [Roadmap](docs/roadmap.md) · [Identità visiva](branding/README.md)
-
-Traccia si chiamava **AulaLocale**. Il nome del repository, il modulo `aulalocale`, le variabili `AULALOCALE_*`, l’identificatore Mac e i percorsi dei dati restano compatibili: le lezioni esistenti non vanno reimportate.
-
-Il repository è pubblico; la **licenza del codice deve ancora essere scelta**. Non viene quindi presentato come software già rilasciato con licenza open source. Modelli e dipendenze conservano le proprie condizioni, incluse quelle di Mutagen/FFmpeg, da verificare prima della distribuzione del prodotto.
-
-[VoiceStudio](https://github.com/debpalash/voicestudio) ha ispirato l’attenzione all’installazione e ai modelli locali. Traccia è un progetto indipendente e non ne incorpora il codice.
-
-`sviluppo` contiene il lavoro corrente. Le promozioni su `main` richiedono conferma esplicita; non è attivo l’auto-merge.
-
-</details>
-
----
-
-<p align="center"><strong>Traccia · Ogni lezione lascia il segno.</strong><br><sub>Un progetto per trasformare le registrazioni in un percorso di studio.</sub></p>
+**Acknowledgment:** [VoiceStudio](https://github.com/debpalash/voicestudio) inspired the attention to local models and installation experience. Traccia is independent and does not incorporate its code. Work happens on `sviluppo`; promotion to `main` requires explicit approval.

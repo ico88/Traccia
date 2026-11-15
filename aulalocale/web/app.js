@@ -24,16 +24,16 @@ async function request(path, options = {}) {
   let response;
   const {allowMissing = false, ...fetchOptions} = options;
   try { response = await fetch(path, {credentials: 'same-origin', ...fetchOptions}); }
-  catch (error) { if (error.name === 'AbortError') throw error; throw new Error('Connessione interrotta. Verifica che AulaLocale sia in esecuzione.'); }
-  if (response.status === 401) { signedOut(); throw new Error('Accesso richiesto. Inserisci il token locale.'); }
+  catch (error) { if (error.name === 'AbortError') throw error; throw new Error(T('Connessione interrotta. Verifica che AulaLocale sia in esecuzione.')); }
+  if (response.status === 401) { signedOut(); throw new Error(T('Accesso richiesto. Inserisci il token locale.')); }
   if (response.status === 404 && allowMissing) return null;
   if (!response.ok) {
     let detail; try { detail = (await response.json()).detail; } catch { /* generic below */ }
-    if (response.status === 409) throw new Error(typeof detail === 'string' ? detail : 'Questa registrazione è già presente nella materia.');
-    if (response.status === 413) throw new Error('Il file supera il limite di 512 MiB.');
-    if (response.status === 422) throw new Error(typeof detail === 'string' ? detail : 'Controlla i campi e il formato audio.');
-    if (response.status === 507) throw new Error('Impossibile salvare: controlla spazio libero e permessi.');
-    throw new Error(typeof detail === 'string' ? detail : 'Operazione non riuscita. Riprova.');
+    if (response.status === 409) throw new Error(typeof detail === 'string' ? detail : T('Questa registrazione è già presente nella materia.'));
+    if (response.status === 413) throw new Error(T('Il file supera il limite di 512 MiB.'));
+    if (response.status === 422) throw new Error(typeof detail === 'string' ? detail : T('Controlla i campi e il formato audio.'));
+    if (response.status === 507) throw new Error(T('Impossibile salvare: controlla spazio libero e permessi.'));
+    throw new Error(typeof detail === 'string' ? detail : T('Operazione non riuscita. Riprova.'));
   }
   return response.status === 204 ? null : response.json();
 }
@@ -63,20 +63,20 @@ function renderLessons() {
   $('empty').hidden = lessons.length > 0;
   $('lesson-count').textContent = lessons.length;
   $('total-duration').textContent = duration(lessons.reduce((sum, l) => sum + l.duration_seconds, 0));
-  const query = $('lesson-search').value.trim().toLocaleLowerCase('it');
-  const visible = lessons.filter(lesson => [lesson.title,lesson.teacher,lesson.lecture_date || ''].join(' ').toLocaleLowerCase('it').includes(query));
+  const query = $('lesson-search').value.trim().toLocaleLowerCase(I18n.locale);
+  const visible = lessons.filter(lesson => [lesson.title,lesson.teacher,lesson.lecture_date || ''].join(' ').toLocaleLowerCase(I18n.locale).includes(query));
   for (const lesson of visible) {
     const card = document.createElement('article'); card.className = 'lesson-card' + (currentLesson && currentLesson.id === lesson.id ? ' active' : '');
     const play = document.createElement('button'); play.className = 'play-button'; play.textContent = '▶';
-    play.setAttribute('aria-label', `Ascolta ${lesson.title}`);
+    play.setAttribute('aria-label', T`Ascolta ${lesson.title}`);
     play.onclick = () => openLesson(lesson,true);
     const details = document.createElement('div'); details.className = 'lesson-details';
     const title = document.createElement('h3'); const open=document.createElement('button'); open.className='lesson-title'; open.textContent=lesson.title; open.onclick=()=>openLesson(lesson,false); title.append(open);
     const meta = document.createElement('p');
-    const date = lesson.lecture_date ? new Date(`${lesson.lecture_date}T12:00:00`).toLocaleDateString('it-IT') : 'Data non indicata';
+    const date = lesson.lecture_date ? new Date(`${lesson.lecture_date}T12:00:00`).toLocaleDateString(I18n.locale) : T('Data non indicata');
     meta.textContent = [date, duration(lesson.duration_seconds), lesson.teacher, `${(lesson.size_bytes / 1048576).toFixed(1)} MiB`].filter(Boolean).join(' · ');
     details.append(title, meta);
-    const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = 'Originale';
+    const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = T('Originale');
     card.append(play, details, badge); $('lessons').append(card);
   }
 }
@@ -89,10 +89,10 @@ async function selectSubject(id) {
   selected = id; renderSubjects();
   const subject = subjects.find(s => s.id === id);
   $('subject-title').textContent = subject.title;
-  $('subject-description').textContent = subject.description || 'Le registrazioni e i materiali di questa materia.';
+  $('subject-description').textContent = subject.description || T('Le registrazioni e i materiali di questa materia.');
   $('open-upload').disabled = false;$('open-recording').disabled=false;
   $('player').pause(); $('player').removeAttribute('src'); $('player').load(); $('player-panel').hidden = true;
-  lessons = []; renderLessons(); $('empty').hidden = true; $('list-status').textContent = 'Caricamento…';
+  lessons = []; renderLessons(); $('empty').hidden = true; $('list-status').textContent = T('Caricamento…');
   try {
     const result = await allPages(`/api/v1/subjects/${encodeURIComponent(id)}/lessons`);
     if (version !== loadingVersion) return;
@@ -106,8 +106,8 @@ async function openWorkspace() {
   if (subjects.length) await selectSubject(subjects[0].id);
   else {
     selected = null; lessons = []; renderLessons(); $('open-upload').disabled = true;$('open-recording').disabled=true;
-    $('subject-title').textContent = 'Il tuo spazio di studio';
-    $('subject-description').textContent = 'Una materia alla volta, una lezione dopo l’altra.';
+    $('subject-title').textContent = T('Il tuo spazio di studio');
+    $('subject-description').textContent = T('Una materia alla volta, una lezione dopo l’altra.');
   }
 }
 $('login-form').onsubmit = async event => {
@@ -128,21 +128,21 @@ $('subject-form').onsubmit = async event => {
   event.preventDefault(); const button = event.submitter; button.disabled = true;
   try {
     const subject = await request('/api/v1/subjects', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({title:$('subject-name').value.trim(),description:$('description').value.trim()})});
-    subjects.push(subject); $('subject-dialog').close(); $('subject-form').reset(); await selectSubject(subject.id); notify('Materia creata.');
+    subjects.push(subject); $('subject-dialog').close(); $('subject-form').reset(); await selectSubject(subject.id); notify(T('Materia creata.'));
   } catch (e) { notify(e.message, true); } finally { button.disabled = false; }
 };
 const suggestionFields = {'title':'lesson-title','teacher':'teacher','lecture_date':'lecture-date'};
 function clearSelection() {
   selectedAudio = null; autoFields = {}; previewVersion++;
   if (previewController) previewController.abort();
-  $('selected-file').textContent = 'MP3, WAV, M4A o FLAC · massimo 512 MiB';
-  $('suggestion-status').textContent = 'Titolo, data e docente saranno proposti dal nome e dai metadati, quando disponibili.';
+  $('selected-file').textContent = T('MP3, WAV, M4A o FLAC · massimo 512 MiB');
+  $('suggestion-status').textContent = T('Titolo, data e docente saranno proposti dal nome e dai metadati, quando disponibili.');
 }
 async function chooseAudio(file) {
   if (importing || !file) return;
   if (!/\.(mp3|wav|m4a|flac)$/i.test(file.name) || file.size > 512 * 1024 * 1024) {
     clearSelection(); $('audio-file').value = '';
-    notify('Scegli un MP3, WAV, M4A o FLAC fino a 512 MiB.', true); return;
+    notify(T('Scegli un MP3, WAV, M4A o FLAC fino a 512 MiB.'), true); return;
   }
   const version = ++previewVersion;
   if (previewController) previewController.abort();
@@ -157,7 +157,7 @@ async function chooseAudio(file) {
     $('lesson-title').value = title; autoFields.title = title;
   }
   const baseline = Object.fromEntries(Object.entries(suggestionFields).map(([key,id]) => [key,$(id).value]));
-  $('suggestion-status').textContent = 'Lettura del nome e dei metadati audio… Puoi già modificare i campi.';
+  $('suggestion-status').textContent = T('Lettura del nome e dei metadati audio… Puoi già modificare i campi.');
   const data = new FormData(); data.append('file',file,file.name);
   try {
     const result = await request('/api/v1/audio/preview',{method:'POST',body:data,signal:previewController.signal});
@@ -169,13 +169,13 @@ async function chooseAudio(file) {
         $(id).value = candidate; autoFields[key] = candidate;
       }
     }
-    const sources = {filename:'nome del file',embedded_title:'titolo nei tag',embedded_artist:'artista nei tag',embedded_date:'data nei tag'};
-    const labels = {title:'Titolo',teacher:'Docente',lecture_date:'Data'};
+    const sources = {filename:T('nome del file'),embedded_title:T('titolo nei tag'),embedded_artist:T('artista nei tag'),embedded_date:T('data nei tag')};
+    const labels = {title:T('Titolo'),teacher:T('Docente'),lecture_date:T('Data')};
     const hints = Object.entries(result.sources).map(([key,source]) => `${labels[key]}: ${sources[source]}.`);
-    $('suggestion-status').textContent = ['Proposte da verificare prima di importare.',...hints,...result.notes].join('\n');
+    $('suggestion-status').textContent = [T('Proposte da verificare prima di importare.'),...hints,...result.notes].join('\n');
   } catch (error) {
     if (version !== previewVersion || error.name === 'AbortError') return;
-    $('suggestion-status').textContent = 'Metadati non disponibili. Puoi compilare i campi manualmente; l’audio sarà verificato durante l’importazione.';
+    $('suggestion-status').textContent = T('Metadati non disponibili. Puoi compilare i campi manualmente; l’audio sarà verificato durante l’importazione.');
   }
 }
 $('audio-file').onchange = () => chooseAudio($('audio-file').files[0]);
@@ -188,7 +188,7 @@ $('drop-zone').addEventListener('dragleave',event => {
 $('drop-zone').addEventListener('drop',event => {
   event.preventDefault(); event.stopPropagation(); $('drop-zone').classList.remove('dragover');
   const files = event.dataTransfer.files;
-  if (files.length !== 1) { notify('Trascina una registrazione alla volta.',true); return; }
+  if (files.length !== 1) { notify(T('Trascina una registrazione alla volta.'),true); return; }
   $('audio-file').value = '';
   chooseAudio(files[0]);
 });
@@ -198,20 +198,20 @@ window.addEventListener('drop',event => { if ([...event.dataTransfer.types].incl
 $('upload-form').onsubmit = async event => {
   event.preventDefault(); if (!selected) return;
   const file = selectedAudio;
-  if (!file || file.size > 512 * 1024 * 1024) { notify('Scegli un file audio fino a 512 MiB.', true); return; }
+  if (!file || file.size > 512 * 1024 * 1024) { notify(T('Scegli un file audio fino a 512 MiB.'), true); return; }
   const sid = selected, button = event.submitter; button.disabled = true;
   importing = true; $('audio-file').disabled = true;
   const form = new FormData($('upload-form'));
   form.set('file',file,file.name);
   if (!form.get('lecture_date')) form.delete('lecture_date');
-  $('upload-status').textContent = 'Caricamento e verifica audio in corso. Per registrazioni lunghe può richiedere alcuni minuti.';
+  $('upload-status').textContent = T('Caricamento e verifica audio in corso. Per registrazioni lunghe può richiedere alcuni minuti.');
   try {
     await request(`/api/v1/subjects/${encodeURIComponent(sid)}/lessons`, {method:'POST',body:form});
     $('upload-dialog').close(); $('upload-form').reset(); clearSelection();
     if (selected === sid) await selectSubject(sid);
-    notify('Lezione importata. L’audio originale è pronto per l’ascolto.');
+    notify(T('Lezione importata. L’audio originale è pronto per l’ascolto.'));
   } catch (e) { notify(e.message, true); }
-  finally { importing = false; $('audio-file').disabled = false; button.disabled = false; $('upload-status').textContent = 'L’originale sarà conservato senza modifiche.'; }
+  finally { importing = false; $('audio-file').disabled = false; button.disabled = false; $('upload-status').textContent = T('L’originale sarà conservato senza modifiche.'); }
 };
 function resetAudioState() {
   if (typeof resetStudy === 'function') resetStudy();
@@ -228,19 +228,19 @@ function renderAudioJob() {
   $('transcription-source').options[1].disabled=!completed;
   if(!completed)$('transcription-source').value='original';
   $('enhance-audio').disabled = Boolean(active || completed);
-  $('enhance-audio').textContent = completed ? 'Versione pronta' : 'Migliora audio';
+  $('enhance-audio').textContent = completed ? T('Versione pronta') : T('Migliora audio');
   $('cancel-enhancement').hidden = !active;
   $('audio-progress').hidden = !active;
   $('audio-progress').value = job ? job.progress : 0;
   const statuses = {
-    queued:'In coda. L’elaborazione inizierà appena il motore è libero.',
-    running:`Elaborazione in corso · ${Math.floor(job ? job.progress : 0)}%`,
-    completed:'Versione pronta. Premi Migliorato per confrontarla dallo stesso punto.',
-    cancelled:'Elaborazione annullata. Puoi avviarla di nuovo.',
-    interrupted:'Elaborazione interrotta: ripartirà all’avvio del servizio.',
-    failed:'Elaborazione non riuscita. Verifica che l’originale sia presente e che ci sia spazio libero, poi riprova.'
+    queued:T('In coda. L’elaborazione inizierà appena il motore è libero.'),
+    running:T`Elaborazione in corso · ${Math.floor(job ? job.progress : 0)}%`,
+    completed:T('Versione pronta. Premi Migliorato per confrontarla dallo stesso punto.'),
+    cancelled:T('Elaborazione annullata. Puoi avviarla di nuovo.'),
+    interrupted:T('Elaborazione interrotta: ripartirà all’avvio del servizio.'),
+    failed:T('Elaborazione non riuscita. Verifica che l’originale sia presente e che ci sia spazio libero, poi riprova.')
   };
-  $('enhancement-status').textContent = job ? statuses[job.status] || job.status : 'Scegli un’intensità e crea una versione da confrontare.';
+  $('enhancement-status').textContent = job ? statuses[job.status] || job.status : T('Scegli un’intensità e crea una versione da confrontare.');
 }
 async function refreshAudioJob() {
   clearTimeout(audioPollTimer);
@@ -260,14 +260,14 @@ async function switchAudio(improved, keepPosition = true, autoplay = null) {
   const playing = autoplay === null ? !player.paused : autoplay;
   const rate = Number($('speed').value), sourceVersion = ++audioSourceVersion;
   player.pause();
-  $('audio-source-label').textContent = improved ? 'AUDIO MIGLIORATO' : 'AUDIO ORIGINALE';
+  $('audio-source-label').textContent = improved ? T('AUDIO MIGLIORATO') : T('AUDIO ORIGINALE');
   $('source-original').setAttribute('aria-pressed',String(!improved));
   $('source-enhanced').setAttribute('aria-pressed',String(improved));
   player.onloadedmetadata = async () => {
     if (sourceVersion !== audioSourceVersion) return;
     player.currentTime = Math.min(position,Math.max(0,(player.duration || position) - .05));
     player.playbackRate = rate;
-    if (playing) try { await player.play(); } catch { notify('Premi Play nel lettore per avviare l’ascolto.',true); }
+    if (playing) try { await player.play(); } catch { notify(T('Premi Play nel lettore per avviare l’ascolto.'),true); }
   };
   player.src = improved ? `/api/v1/audio-jobs/${encodeURIComponent(currentAudioJob.id)}/audio` : `/api/v1/lessons/${encodeURIComponent(currentLesson.id)}/audio`;
   player.load();
@@ -293,7 +293,7 @@ $('enhance-audio').onclick = async () => {
   try {
     const job = await request(`/api/v1/lessons/${encodeURIComponent(id)}/enhancements`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(enhancementOptions())});
     if (currentLesson && currentLesson.id === id) { await refreshAudioJob(); }
-    notify(job.status === 'completed' ? 'La versione migliorata è già pronta.' : 'Elaborazione avviata. Puoi continuare a usare l’archivio.');
+    notify(job.status === 'completed' ? T('La versione migliorata è già pronta.') : T('Elaborazione avviata. Puoi continuare a usare l’archivio.'));
   } catch(e) { notify(e.message,true); renderAudioJob(); }
 };
 $('cancel-enhancement').onclick = async () => {
@@ -303,7 +303,7 @@ $('cancel-enhancement').onclick = async () => {
   catch(e) { notify(e.message,true); }
 };
 $('speed').onchange = () => { $('player').playbackRate = Number($('speed').value); };
-$('player').onerror = () => { if ($('player').getAttribute('src')) notify('Audio non disponibile o formato non riproducibile dal browser. Prova a riaprire la sessione.', true); };
+$('player').onerror = () => { if ($('player').getAttribute('src')) notify(T('Audio non disponibile o formato non riproducibile dal browser. Prova a riaprire la sessione.'), true); };
 async function bootstrapWorkspace() {
   const access = new URLSearchParams(window.location.hash.slice(1)).get('access');
   if (access) {
@@ -312,11 +312,12 @@ async function bootstrapWorkspace() {
   }
   await openWorkspace();
   const environment=await request('/api/v1/environment');
+  window.tracciaDesktop=environment.desktop;
   $('quit-desktop').hidden=!environment.desktop;
 }
 $('quit-desktop').onclick=async()=>{
   if (typeof mayLeaveTranscript === 'function' && !mayLeaveTranscript()) return;
-  try {await request('/api/v1/shutdown',{method:'POST'});signedOut();notify('AulaLocale è stata chiusa. Puoi chiudere questa scheda.');}
+  try {await request('/api/v1/shutdown',{method:'POST'});signedOut();notify(T('AulaLocale è stata chiusa. Puoi chiudere questa scheda.'));}
   catch(e){notify(e.message,true);}
 };
 bootstrapWorkspace().catch(e => { if (!$('login-view').hidden) return; notify(e.message, true); });

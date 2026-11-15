@@ -1,5 +1,3 @@
-# Immagini del README
+# README images
 
-`library.png` e `notes.png` sono catture della finestra Mac di Traccia 0.9.1. L’archivio dimostrativo è stato creato appositamente con materie e testi di esempio e tracce WAV sintetiche silenziose. Le dispense mostrate sono esempi inseriti manualmente, non risultati di un benchmark IA. Non contengono lezioni, trascrizioni o dati personali dell’utente.
-
-Le immagini sono ridimensionate a 1600 pixel di larghezza; il contenuto dell’interfaccia non è stato alterato. `hero.svg` è una composizione grafica originale per la presentazione del progetto.
+`library.png` / `notes.png` show the Italian interface in preview 0.9.1. `library-en.png` / `notes-en.png` show the English interface in preview 0.10. They are real captures of the packaged Mac window with a fictional demo library, manually written sample notes and silent synthetic WAVs. They contain no personal recordings or transcripts and are not AI quality benchmarks. Images are resized to 1600 pixels wide without altering UI contents. `hero.svg` is an original graphical introduction.

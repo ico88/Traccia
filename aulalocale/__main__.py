@@ -10,6 +10,9 @@ import webbrowser
 
 import uvicorn
 from aulalocale.app import create_app
+from aulalocale.preferences import DesktopPreferences
+
+
 
 
 def main():
@@ -48,7 +51,8 @@ def main():
             deadline=time.monotonic()+30
             while not server.started and service.is_alive() and time.monotonic()<deadline:time.sleep(.05)
             if not server.started:raise RuntimeError('Il servizio locale non si è avviato. Controlla il log dell’app.')
-            window=webview.create_window('Traccia',f'http://127.0.0.1:{port}/#access={nonce}',width=1280,height=860,min_size=(880,620),background_color='#f8f9f6')
+            preferences=DesktopPreferences(root)
+            window=webview.create_window('Traccia',f'http://127.0.0.1:{port}/#access={nonce}&language={preferences.language()}',width=1280,height=860,min_size=(880,620),background_color='#f8f9f6')
             window.events.closed += lambda: setattr(server,'should_exit',True)
             webview.settings['ALLOW_DOWNLOADS']=True
             webview.start(private_mode=True,debug=False)

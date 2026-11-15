@@ -74,3 +74,9 @@ Pacchetto Mac 0.8 verificato: avvio del server incluso, risorse web, GTCRN, Whis
 ## Sviluppo 0.9 — audio e finestra Mac
 
 82 test backend superati, incluso il ripristino delle assegnazioni manuali dei parlanti. Test del ricampionamento AudioWorklet a 16/44,1/48 kHz superati. Finestra Mac WebKit verificata visivamente nel pacchetto. Prova del pacchetto senza interfaccia: upload, FFmpeg, GTCRN, Whisper sul WAV migliorato, proposta Qwen e arresto completati. Dettagli e limiti in [audio-desktop.md](audio-desktop.md).
+
+## Multilingual preview 0.10
+
+84 backend tests passed, including validation of note output language and authenticated desktop preference persistence across launcher instances. The JavaScript i18n check covers English/Italian rendering, fallback, placeholder safety, preference storage, preservation of user text and guards against language changes while recording or with unsaved edits.
+
+Browser and packaged Mac checks confirmed English/Italian switching. The Mac preference was saved, the app closed and restarted on a different loopback port, and English was retained. Existing course text remained unchanged. New-note prompts were checked for the requested output language using a controlled LLM adapter; this does not measure English summary quality. Some backend diagnostics, generated map labels and operating-system media controls retain their source/system language.

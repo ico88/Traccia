@@ -3,6 +3,8 @@ from contextlib import asynccontextmanager, closing
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID, uuid4
+from typing import Literal
+from .preferences import DesktopPreferences
 import hmac
 import os
 import sqlite3
@@ -18,6 +20,10 @@ from .enhancement import AudioWorker, enhancement_router, migrate_enhancement
 from .models import ModelManager, models_router
 from .materials import migrate_materials, materials_router
 from .study import StudyEngine, study_router, migrate_study
+
+
+class InterfaceLanguage(BaseModel):
+    language:Literal['en','it']
 
 
 class SubjectInput(BaseModel):
@@ -76,7 +82,7 @@ def create_app(data_dir: Path | None = None, token: str | None = None, bootstrap
             worker.stop()
             models.close()
 
-    api = FastAPI(title="Traccia", version="0.9.1", lifespan=lifespan,
+    api = FastAPI(title="Traccia", version="0.10.0", lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
     bearer = HTTPBearer(auto_error=False)
 
@@ -106,6 +112,11 @@ def create_app(data_dir: Path | None = None, token: str | None = None, bootstrap
     @api.get("/api/v1/environment", dependencies=[Depends(authenticate)])
     def environment():
         return {"desktop": shutdown_callback is not None}
+
+    @api.put('/api/v1/desktop-language',status_code=204,dependencies=[Depends(authenticate)])
+    def desktop_language(options:InterfaceLanguage):
+        if shutdown_callback is None:raise HTTPException(404,'Only available in desktop mode')
+        DesktopPreferences(root).set_language(options.language)
 
     @api.post("/api/v1/desktop-session", status_code=204)
     def desktop_session(request: Request, response: Response):

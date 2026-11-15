@@ -54,3 +54,20 @@ def test_desktop_bootstrap_is_same_origin_and_single_use(tmp_path):
         assert client.post('/api/v1/desktop-session',headers={**headers,**ORIGIN}).status_code==401
         assert client.post('/api/v1/shutdown',headers=ORIGIN).status_code==204
         assert closed==[True]
+
+
+def test_desktop_language_persists_across_launches_and_requires_auth(tmp_path):
+    from aulalocale.preferences import DesktopPreferences
+    with TestClient(create_app(tmp_path,TOKEN,shutdown_callback=lambda:None)) as client:
+        route='/api/v1/desktop-language'
+        assert client.put(route,json={'language':'en'}).status_code==401
+        assert client.put(route,headers=AUTH,json={'language':'fr'}).status_code==422
+        assert client.put(route,headers=AUTH,json={'language':'en'}).status_code==204
+        assert DesktopPreferences(tmp_path).language()=='en'
+        client.post('/api/v1/session',headers=AUTH)
+        assert client.put(route,json={'language':'it'}).status_code==403
+        assert client.put(route,headers=ORIGIN,json={'language':'it'}).status_code==204
+    assert DesktopPreferences(tmp_path).language()=='it'
+    with TestClient(create_app(tmp_path,TOKEN)) as client:
+        assert client.put(route,headers=AUTH,json={'language':'en'}).status_code==404
+    assert DesktopPreferences(tmp_path).language()=='it'
