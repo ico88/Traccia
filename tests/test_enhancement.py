@@ -153,3 +153,33 @@ def test_archive_refuses_second_worker(tmp_path):
         with pytest.raises(RuntimeError,match='another worker'):
             with TestClient(create_app(tmp_path,TOKEN)):
                 pass
+
+
+def test_interval_preview_is_distinct_bounded_and_preserves_original(tmp_path):
+    with TestClient(create_app(tmp_path,TOKEN)) as client:
+        lid=lesson(client)
+        full=create(client,lid);assert wait(client,full['id'])['status']=='completed'
+        options={'method':'traditional','preset':'balanced','preview_start':.1,'preview_end':.7,'gain_db':3}
+        response=client.post(f'/api/v1/lessons/{lid}/enhancements',headers=AUTH,json=options)
+        assert response.status_code==202,response.text
+        job=response.json();assert job['id']!=full['id'] and job['gain_db']==3 and job['preview']=={'start':.1,'end':.7}
+        assert wait(client,job['id'])['status']=='completed'
+        assert client.post(f'/api/v1/lessons/{lid}/transcribe',headers=AUTH,json={'audio_job_id':job['id']}).status_code==422
+        assert client.post(f'/api/v1/lessons/{lid}/enhancements',headers=AUTH,json=options).json()['id']==job['id']
+        options['preview_end']=2
+        assert client.post(f'/api/v1/lessons/{lid}/enhancements',headers=AUTH,json=options).status_code==422
+        options['preview_end']=.7;options['method']='voxlock'
+        assert client.post(f'/api/v1/lessons/{lid}/enhancements',headers=AUTH,json=options).status_code in (409,422)
+        with sqlite3.connect(tmp_path/'aulalocale.sqlite3') as c:filename,expected=c.execute('SELECT storage_name,sha256 FROM lessons WHERE id=?',(lid,)).fetchone()
+        assert hashlib.sha256((tmp_path/'originals'/filename).read_bytes()).hexdigest()==expected
+        assert mutagen.File(tmp_path/'enhanced'/(job['id']+'.mp3')).info.length<.9
+
+
+def test_second_instance_does_not_migrate_an_open_archive(tmp_path):
+    with TestClient(create_app(tmp_path,TOKEN)):
+        with sqlite3.connect(tmp_path/'aulalocale.sqlite3') as c:c.execute('PRAGMA user_version=5')
+        with pytest.raises(RuntimeError,match='another worker'):
+            with TestClient(create_app(tmp_path,TOKEN)):pass
+        with sqlite3.connect(tmp_path/'aulalocale.sqlite3') as c:
+            assert c.execute('PRAGMA user_version').fetchone()[0]==5
+            c.execute('PRAGMA user_version=6')

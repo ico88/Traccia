@@ -43,7 +43,8 @@ class Lesson(BaseModel):
 
 def migrate_lessons(connection):
     version = connection.execute("PRAGMA user_version").fetchone()[0]
-    if version > 5:
+    from . import ARCHIVE_SCHEMA
+    if version > ARCHIVE_SCHEMA:
         raise RuntimeError("Database is newer than this application; refusing to downgrade")
     connection.execute("""CREATE TABLE IF NOT EXISTS lessons (
         id TEXT PRIMARY KEY, subject_id TEXT NOT NULL REFERENCES subjects(id),

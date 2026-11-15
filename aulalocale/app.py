@@ -5,6 +5,7 @@ from pathlib import Path
 from uuid import UUID, uuid4
 from typing import Literal
 from .preferences import DesktopPreferences
+from . import __version__
 import hmac
 import os
 import sqlite3
@@ -70,22 +71,23 @@ def create_app(data_dir: Path | None = None, token: str | None = None, bootstrap
         if len(secret) < 32 or not secret.isascii():
             raise RuntimeError("AULALOCALE_TOKEN must contain at least 32 ASCII characters")
         root.mkdir(parents=True, exist_ok=True)
-        with closing(connect()) as connection, connection:
-            connection.execute("""CREATE TABLE IF NOT EXISTS subjects (
-                id TEXT PRIMARY KEY, title TEXT NOT NULL,
-                description TEXT NOT NULL, created_at TEXT NOT NULL)""")
-            migrate_lessons(connection)
-            migrate_enhancement(connection)
-            migrate_study(connection)
-            migrate_materials(connection)
-        worker.start()
         try:
+            worker.acquire_lease()
+            with closing(connect()) as connection, connection:
+                connection.execute("""CREATE TABLE IF NOT EXISTS subjects (
+                    id TEXT PRIMARY KEY, title TEXT NOT NULL,
+                    description TEXT NOT NULL, created_at TEXT NOT NULL)""")
+                migrate_lessons(connection)
+                migrate_enhancement(connection)
+                migrate_study(connection)
+                migrate_materials(connection)
+            worker.start()
             yield
         finally:
             worker.stop()
             models.close()
 
-    api = FastAPI(title="Traccia", version="0.10.0", lifespan=lifespan,
+    api = FastAPI(title="Traccia", version=__version__, lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
     bearer = HTTPBearer(auto_error=False)
 
@@ -111,6 +113,11 @@ def create_app(data_dir: Path | None = None, token: str | None = None, bootstrap
             raise HTTPException(403, "Cross-origin session request refused")
         if request.method not in {"GET", "HEAD", "OPTIONS"} and origin != expected_origin:
             raise HTTPException(403, "Same-origin request required")
+
+    @api.get('/api/v1/archive-health',dependencies=[Depends(authenticate)])
+    def archive_health():
+        from .archive_health import inspect
+        with worker.lock:return inspect(root,connect)
 
     @api.get("/api/v1/environment", dependencies=[Depends(authenticate)])
     def environment():
@@ -156,6 +163,9 @@ def create_app(data_dir: Path | None = None, token: str | None = None, bootstrap
         response.delete_cookie(session_cookie, path="/api/v1", httponly=True, samesite="strict")
         response.headers["Cache-Control"] = "no-store"
 
+    from .evidence import EvidenceService,evidence_router
+    study.evidence=EvidenceService(root,connect,worker,study)
+    api.include_router(evidence_router(study.evidence,authenticate))
     api.include_router(speakers_router(speakers,study,authenticate))
     api.include_router(recording_router(root,connect,authenticate))
 

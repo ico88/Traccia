@@ -34,3 +34,23 @@ def test_review_page_escapes_transcripts_and_uses_local_audio():
     assert '&lt;script&gt;' in page
     assert '/private/data/' not in page
     assert "src='sample.wav'" in page
+
+
+def test_human_review_scores_are_weighted_and_unreviewed_text_is_excluded():
+    from scripts.score_evaluation import score_report
+    report={'results':[{'sample':'short','condition':'normalized','boundary_split':False,'text':'x'},{'sample':'long','condition':'normalized','boundary_split':False,'text':'b b b b b b b b b'},{'sample':'unreviewed','condition':'normalized','boundary_split':False,'text':'perfect'}]}
+    review={'samples':[{'id':'short','reference':'a','reference_reviewed':True},{'id':'long','reference':'b b b b b b b b b','reference_reviewed':True},{'id':'unreviewed','reference':'perfect','reference_reviewed':False}]}
+    scored=score_report(report,review);assert scored['human_reviewed_samples']==2
+    assert scored['aggregate_scores']['normalized / whole']['wer']==.1
+    assert scored['aggregate_scores']['normalized / whole']['cer']==.1
+    assert scored['results'][2]['scores'] is None
+
+
+def test_label_hidden_listening_ratings_are_mapped_to_actual_conditions():
+    from scripts.score_evaluation import score_report
+    report={'results':[{'sample':'clip','condition':'normalized','boundary_split':False,'text':''},{'sample':'clip','condition':'gtcrn-normalized','boundary_split':False,'text':''}]}
+    review={'samples':[{'id':'clip','reference':'','reference_reviewed':False,'conditions':{'A':'gtcrn-normalized','B':'normalized'},'ratings':{'A':{'clarity':4,'naturalness':None},'B':{'clarity':2}}}]}
+    scored=score_report(report,review);assert scored['human_reviewed_samples']==0
+    assert scored['listening_ratings']['gtcrn-normalized']['clarity']['mean']==4
+    assert scored['listening_ratings']['normalized']['clarity']['count']==1
+    assert 'naturalness' not in scored['listening_ratings']['gtcrn-normalized']

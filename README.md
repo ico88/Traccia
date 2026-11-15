@@ -22,6 +22,10 @@ Models run on your Mac or your own server. The standard workflow needs no accoun
 
 *Real app screenshot with a fictional demo archive and synthetic silent recordings. No personal lecture data. This capture shows the English interface; Italian is also available.*
 
+## Development progress
+
+The `0.11` development line adds interval audio previews, read-only course-note history, archive health and reversible derivative quarantine, optional local citation review, PDF raster-figure extraction and source-linked study diagrams. [Implementation status and limits](docs/roadmap-0.11.md). These are separate from the tagged 0.10 download above.
+
 ## One app, more than one language
 
 Choose **English or Italian** for the interface; your preference is remembered on this device. Select **Italian, English or automatic detection** for transcription, and **English or Italian** for new course-note sections. These settings are independent: changing the interface never translates or rewrites your saved lectures. Some technical diagnostics and generated image labels still use their original language.
@@ -98,7 +102,7 @@ Weights use pinned revisions and SHA-256 checksums. Downloads come from Hugging 
 
 The documented checks include **backend regression tests** and real runtime trials on the M4. These are not an accuracy guarantee. Physical microphone access and permission behavior still need manual testing. [Verification →](docs/verification.md)
 
-Next priorities include evaluation on more real lectures, live transcription, extracting figures from slides/PDFs, generated illustrations, multiple users and signed/notarized Mac distribution. [Roadmap →](docs/roadmap.md)
+Next priorities include evaluation on more real lectures, live transcription, broader slide/PDF support beyond raster extraction, generated scientific illustrations, multiple users and signed/notarized Mac distribution. [Roadmap →](docs/roadmap.md)
 
 Feedback on study workflows, reproducible issues and audio quality comparisons is welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before code contributions. Please do not upload private lectures, transcripts or tokens to issues. If the project is useful to you, a ⭐ helps others discover it.
 

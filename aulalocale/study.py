@@ -10,7 +10,7 @@ import json
 import re
 import subprocess
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 import imageio_ffmpeg
@@ -169,6 +169,7 @@ class StudyEngine:
             with TemporaryDirectory(prefix='study-',dir=self.root) as temp:
                 if job['kind']=='transcription':self.transcribe(job,Path(temp))
                 elif job['kind']=='speakers':self.speakers.execute(job,Path(temp),self)
+                elif job['kind']=='evidence':self.evidence.execute(job,Path(temp))
                 else:self.generate_notes(job,Path(temp))
             with self.worker.lock:
                 if self.cancelled(identifier):raise InterruptedError()
@@ -203,6 +204,9 @@ class StudyEngine:
             with closing(self.connect()) as c:
                 enhanced=c.execute("SELECT * FROM audio_jobs WHERE id=? AND lesson_id=? AND status='completed'",(options['audio_job_id'],job['lesson_id'])).fetchone()
             if not enhanced:raise ValueError('La versione audio selezionata non è disponibile.')
+            try:preview=json.loads(enhanced['filter']).get('preview')
+            except ValueError:preview=None
+            if preview:raise ValueError('An audio preview cannot be used to transcribe the complete lecture')
             lossless=self.root/'enhanced'/(enhanced['id']+'.wav')
             source=lossless if lossless.is_file() else self.root/'enhanced'/(enhanced['id']+'.mp3')
             source_recipe=enhanced['filter']
@@ -243,13 +247,14 @@ class StudyEngine:
         if not binary:raise ValueError('Runtime llama.cpp non installato.')
         prompt_file=temp/'prompt.txt';result_file=temp/'answer.txt';grammar_file=temp/'notes.gbnf'
         prompt_file.write_text(prompt)
-        grammar=ROUTE_GRAMMAR if mode=='route' else MERGE_GRAMMAR if mode=='merge' else NOTES_GRAMMAR
+        from .evidence import CHECK_GRAMMAR
+        grammar=CHECK_GRAMMAR if mode=='evidence' else ROUTE_GRAMMAR if mode=='route' else MERGE_GRAMMAR if mode=='merge' else NOTES_GRAMMAR
         if citation_count:
             allowed=' | '.join(json.dumps(str(i)) for i in range(0 if mode=='route' else 1,citation_count+1))
             grammar=grammar.replace('integer ::= [1-9] [0-9]{0,5} ws','integer ::= ('+allowed+') ws')
         grammar_file.write_text(grammar)
         result_file.unlink(missing_ok=True)
-        self.process([binary,'-m',str(model),'--offline','-f',str(prompt_file),'-st','--simple-io','--no-display-prompt','--log-disable','--reasoning','off','--temp','0.2','-c','8192','-n','2800' if mode=='merge' else '1600','-t','4','--grammar-file',str(grammar_file),'-o',str(result_file)],identifier)
+        self.process([binary,'-m',str(model),'--offline','-f',str(prompt_file),'-st','--simple-io','--no-display-prompt','--log-disable','--reasoning','off','--temp','0.2','-c','8192','-n','2800' if mode in ('merge','evidence') else '1600','-t','4','--grammar-file',str(grammar_file),'-o',str(result_file)],identifier)
         raw=result_file.read_text()
         text=raw.rsplit('Assistant:\n',1)[-1].strip() if 'Assistant:\n' in raw else ''
         try:
@@ -347,6 +352,9 @@ def study_router(engine,authenticate):
             with closing(connect()) as c:
                 audio=c.execute("SELECT * FROM audio_jobs WHERE id=? AND lesson_id=? AND status='completed'",(str(options.audio_job_id),str(lesson_id))).fetchone()
             if not audio:raise HTTPException(409,'Scegli una versione audio completata di questa lezione.')
+            try:is_preview=json.loads(audio['filter']).get('preview')
+            except ValueError:is_preview=False
+            if is_preview:raise HTTPException(422,'An interval preview cannot be used as a complete lecture transcription source')
             if not any((engine.root/'enhanced'/(audio['id']+suffix)).is_file() for suffix in ['.wav','.mp3']):
                 raise HTTPException(409,'Il file audio selezionato non è disponibile.')
         engine.models.require('whisper-turbo')
@@ -422,6 +430,21 @@ def study_router(engine,authenticate):
         if not transcripts:raise HTTPException(409,'Trascrivi almeno una lezione prima di generare la dispensa.')
         if old and not note_plan(old['chapters'],transcripts)[1]:raise HTTPException(409,'La dispensa include già tutte le trascrizioni correnti. Aggiungi o correggi una lezione prima di aggiornarla.')
         return enqueue('notes',str(subject_id),None,{'base_revision':old['id'] if old else None,'transcripts':transcripts,'language':language})
+
+    @router.get('/subjects/{subject_id}/notes/revisions')
+    def note_revisions(subject_id:UUID,limit:int=Query(50,ge=1,le=200),offset:int=Query(0,ge=0)):
+        with closing(connect()) as c:
+            require_subject(c,subject_id)
+            rows=c.execute('SELECT * FROM notes WHERE subject_id=? AND accepted=1 ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?',(str(subject_id),limit,offset)).fetchall()
+        return [{'id':r['id'],'parent_id':r['parent_id'],'created_at':r['created_at'],'chapter_count':len(json.loads(r['chapters']))} for r in rows]
+
+    @router.get('/subjects/{subject_id}/notes/revisions/{revision_id}')
+    def note_revision(subject_id:UUID,revision_id:UUID):
+        with closing(connect()) as c:
+            require_subject(c,subject_id)
+            row=c.execute('SELECT * FROM notes WHERE subject_id=? AND id=? AND accepted=1',(str(subject_id),str(revision_id))).fetchone()
+        if not row:raise HTTPException(404,'Accepted note revision not found')
+        return note_record(row)
 
     @router.get('/subjects/{subject_id}/notes')
     def notes(subject_id:UUID):

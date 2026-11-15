@@ -8,6 +8,7 @@ import os
 import shutil
 import sqlite3
 import zipfile
+from uuid import UUID
 
 
 def restore(backup:Path,destination:Path):
@@ -22,14 +23,15 @@ def restore(backup:Path,destination:Path):
         info=bundle.getinfo('manifest.json')
         if info.file_size>20*1024**2:raise ValueError('Manifest too large')
         manifest=json.loads(bundle.read('manifest.json'))
-        if manifest.get('schema')!=5:raise ValueError('Unsupported backup schema')
+        from . import ARCHIVE_SCHEMA
+        if manifest.get('schema') not in {5,ARCHIVE_SCHEMA}:raise ValueError('Unsupported backup schema')
         expected=manifest.get('files',{})
         if set(names)!={'manifest.json',*expected} or 'aulalocale.sqlite3' not in expected:raise ValueError('Manifest does not match archive')
         staging=Path(temp)/'archive';staging.mkdir()
         for name,digest in expected.items():
             path=PurePosixPath(name)
             if path.is_absolute() or '..' in path.parts or '\\' in name or len(path.parts)>2:raise ValueError('Unsafe backup path')
-            if name!='aulalocale.sqlite3' and (len(path.parts)!=2 or path.parts[0] not in {'originals','enhanced','materials','speakers'}):raise ValueError('Unexpected backup file')
+            if name!='aulalocale.sqlite3' and (len(path.parts)!=2 or path.parts[0] not in {'originals','enhanced','materials','speakers','evidence'}):raise ValueError('Unexpected backup file')
             if bundle.getinfo(name).external_attr>>16 & 0o170000 == 0o120000:raise ValueError('Symbolic links are not allowed')
             target=staging.joinpath(*path.parts);target.parent.mkdir(exist_ok=True)
             checksum=hashlib.sha256()
@@ -38,15 +40,25 @@ def restore(backup:Path,destination:Path):
             if checksum.hexdigest()!=digest:raise ValueError('Backup checksum mismatch')
         with sqlite3.connect(staging/'aulalocale.sqlite3') as c:
             if c.execute('PRAGMA integrity_check').fetchone()[0]!='ok':raise ValueError('Database integrity check failed')
-            if c.execute('PRAGMA user_version').fetchone()[0]!=5:raise ValueError('Database schema mismatch')
+            if c.execute('PRAGMA user_version').fetchone()[0]!=manifest['schema']:raise ValueError('Database schema mismatch')
             if c.execute('PRAGMA foreign_key_check').fetchall():raise ValueError('Broken database references')
+            for table in ['subjects','lessons','audio_jobs','study_jobs','transcripts','notes','materials']:
+                for (identifier,) in c.execute('SELECT id FROM '+table):
+                    try:valid=str(UUID(identifier))==identifier
+                    except (ValueError,TypeError,AttributeError):valid=False
+                    if not valid:raise ValueError('Invalid archive identifier')
             for identifier,filename,checksum in c.execute('SELECT id,storage_name,sha256 FROM lessons'):
                 if Path(filename).name!=filename or '\\' in filename or Path(filename).stem!=identifier or 'originals/'+filename not in expected or expected['originals/'+filename]!=checksum:
                     raise ValueError('Invalid original asset reference')
             for (identifier,) in c.execute("SELECT id FROM study_jobs WHERE kind='speakers' AND status='completed'"):
                 if 'speakers/'+identifier+'.json' not in expected:raise ValueError('Missing speaker analysis')
+            for (identifier,) in c.execute("SELECT id FROM study_jobs WHERE kind='evidence' AND status='completed'"):
+                if 'evidence/'+identifier+'.json' not in expected:raise ValueError('Missing evidence review')
             for identifier,filename in c.execute('SELECT id,filename FROM materials'):
                 if filename!=identifier+'.png' or 'materials/'+filename not in expected:raise ValueError('Invalid image reference')
+            # A portable backup is data, not authorization to execute stored jobs.
+            for table in ['audio_jobs','study_jobs']:
+                c.execute("UPDATE "+table+" SET status='cancelled',error='Restored from backup: start a new job explicitly' WHERE status IN ('queued','running','interrupted')")
         if destination.exists():raise ValueError('Destination appeared during restore')
         staging.rename(destination)
 
