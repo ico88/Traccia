@@ -71,13 +71,19 @@ Il consolidamento tematico è sperimentale. Un riferimento permette di verificar
 
 L’accesso a Internet serve per installare dipendenze e scaricare i modelli. Le bozze di registrazione ancora aperte non sono incluse nel backup: prima completale e salvale come lezioni.
 
+## Scarica la build Mac
+
+[Traccia 0.10 per Apple Silicon (.dmg)](https://github.com/ico88/Traccia/releases/download/v0.10.0/Traccia-0.10-AppleSilicon-sviluppo.dmg) · **anteprima di sviluppo non notarizzata**.
+
+[Sorgenti corrispondenti di terze parti](https://github.com/ico88/Traccia/releases/download/v0.10.0/Traccia-0.10-Corresponding-Sources.zip), inclusi FFmpeg LGPL-2.1-or-later, LAME e istruzioni di compilazione.
+
 ## Inizia con Traccia
 
 ### Mac Apple Silicon
 
 L’app si apre in una **finestra Mac dedicata**, con icona e controlli propri. La modalità browser rimane disponibile per chi preferisce il servizio web.
 
-Per ora il percorso riproducibile pubblico è l’avvio da sorgenti: **non è ancora pubblicata una release Mac stabile scaricabile da questo repository**.
+Per ora il percorso riproducibile pubblico è l’avvio da sorgenti: la build scaricabile è un’anteprima, non una release stabile.
 
 Servono **Python 3.11+**, Git e i **Command Line Tools di Xcode** per compilare i runtime.
 
@@ -126,7 +132,7 @@ Stiamo costruendo Traccia per chi studia ogni giorno tra lezioni, registrazioni 
 
 - **Hai trovato un problema?** [Apri una issue](https://github.com/ico88/Traccia/issues/new) indicando versione, dispositivo e passaggi per riprodurlo.
 - **Hai un’idea?** Racconta quale parte del tuo studio migliorerebbe, prima della soluzione tecnica.
-- **Vuoi contribuire al codice?** Leggi [CONTRIBUTING.md](CONTRIBUTING.md) e lavora su `sviluppo`. La licenza del progetto è ancora da scegliere: concordiamo prima i contributi esterni sostanziali.
+- **Vuoi contribuire al codice?** Leggi [CONTRIBUTING.md](CONTRIBUTING.md) e lavora su `sviluppo`. La licenza del progetto è GPL-3.0-or-later.
 - **Ti interessa il progetto?** Una ⭐ aiuta altre persone a scoprirlo.
 
 Non pubblicare nelle issue registrazioni personali, trascrizioni delle lezioni, token o altri dati riservati.
@@ -142,7 +148,7 @@ Non pubblicare nelle issue registrazioni personali, trascrizioni delle lezioni, 
 
 Traccia si chiamava **AulaLocale**. GitHub reindirizza il vecchio indirizzo al nuovo. Il repository è ora `ico88/Traccia`; il modulo `aulalocale`, le variabili `AULALOCALE_*`, l’identificatore Mac e i percorsi dei dati restano compatibili: le lezioni esistenti non vanno reimportate.
 
-Il repository è pubblico; la **licenza del codice deve ancora essere scelta**. Non viene quindi presentato come software già rilasciato con licenza open source. Modelli e dipendenze conservano le proprie condizioni, incluse quelle di Mutagen/FFmpeg, da verificare prima della distribuzione del prodotto.
+Il repository è pubblico; la licenza del codice è **GPL-3.0-or-later**. Il testo completo è in `LICENSE`. Modelli e dipendenze conservano le proprie condizioni, incluse quelle di Mutagen/FFmpeg, da verificare prima della distribuzione del prodotto.
 
 [VoiceStudio](https://github.com/debpalash/voicestudio) ha ispirato l’attenzione all’installazione e ai modelli locali. Traccia è un progetto indipendente e non ne incorpora il codice.
 

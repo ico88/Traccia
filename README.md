@@ -16,7 +16,7 @@ Traccia is an experimental study app for university students. Organize recording
 
 Models run on your Mac or your own server. The standard workflow needs no account, inference API token or subscription. Internet is needed to install dependencies and download models; inference can then run offline.
 
-> **Preview 0.10.** Current code lives on [`sviluppo`](https://github.com/ico88/Traccia/tree/sviluppo). AI output needs review. Development Mac builds are not notarized; no stable Mac download has been published in this repository yet.
+> **Preview 0.10.** Current code lives on [`sviluppo`](https://github.com/ico88/Traccia/tree/sviluppo). AI output needs review. The development Mac build is ad hoc signed and not notarized.
 
 ![Traccia on Mac: subjects and lecture library](docs/images/library-en.png)
 
@@ -50,6 +50,16 @@ Add a lecture to a subject, review its transcript and prepare an update to the c
 *Manually written demo text in the real app, not an example of AI summarization quality.*
 
 Topic consolidation is experimental. Source links make verification possible; they do not certify the correctness of generated text. [How it works →](docs/dynamic-notes.md)
+
+## Download for Mac
+
+**[Download Traccia 0.10 · Apple Silicon (.dmg)](https://github.com/ico88/Traccia/releases/download/v0.10.0/Traccia-0.10-AppleSilicon-sviluppo.dmg)**
+
+Development preview, **not notarized**. Requires an Apple Silicon Mac. Close the previous app before installing. This is a pre-release for local evaluation, not a stable release.
+
+[Checksums and release notes](https://github.com/ico88/Traccia/releases/tag/v0.10.0) · [Corresponding third-party sources](https://github.com/ico88/Traccia/releases/download/v0.10.0/Traccia-0.10-Corresponding-Sources.zip)
+
+This build uses FFmpeg under LGPL-2.1-or-later; its exact source, LAME source and build commands are included in the source archive linked above.
 
 ## Get started
 
@@ -92,7 +102,7 @@ Next priorities include evaluation on more real lectures, live transcription, ex
 
 Feedback on study workflows, reproducible issues and audio quality comparisons is welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before code contributions. Please do not upload private lectures, transcripts or tokens to issues. If the project is useful to you, a ⭐ helps others discover it.
 
-**License:** the repository is public, but the project code license has not been selected yet. Substantial external contributions should be agreed in advance. Dependencies and models keep their own licenses; redistribution compatibility still needs review.
+**License:** Traccia code is [GPL-3.0-or-later](LICENSE). Models and dependencies retain their own licenses. The development package includes third-party notices and a release-side archive of corresponding copyleft sources and build instructions. See [distribution inventory](docs/distribution.md).
 
 **Compatibility:** the repository is now [`ico88/Traccia`](https://github.com/ico88/Traccia). GitHub redirects the previous `ico88/aulalocale` address. The Python module, environment variables, Mac bundle identifier and data locations retain their original identifiers so existing lectures do not need to be moved or reimported.
 

@@ -70,6 +70,7 @@ After building runtimes on Apple Silicon:
 
 ```sh
 python -m pip install pyinstaller==6.22.3
+python scripts/build_ffmpeg.py --sources ./work/corresponding-sources
 python scripts/build_macos.py --output ./dist-macos --dmg
 ```
 
@@ -103,6 +104,6 @@ Compose binds only `127.0.0.1:8765` and persists the archive in a volume. It doe
 python -m pytest -q
 ```
 
-Set `AULALOCALE_GTCRN_TEST_MODEL` to an already verified local model for neural tests. Tests do not download weights. [Verification](verification.md) distinguishes controlled adapters from real model runs. GitHub CI is not active; the proposed workflow is in `ci-workflow.yml`.
+Set `AULALOCALE_GTCRN_TEST_MODEL` to an already verified local model for neural tests. Tests do not download weights. [Verification](verification.md) distinguishes controlled adapters from real model runs. GitHub CI is active in `.github/workflows/ci.yml`.
 
-The repository is public but the project code license remains undecided. Models and dependencies retain their licenses; Mutagen is GPL and redistribution of the actual FFmpeg build needs review. [Contributing](../CONTRIBUTING.md)
+Traccia is GPL-3.0-or-later. Models and dependencies retain their licenses; Mutagen is GPL and redistribution of the actual FFmpeg build needs review. [Contributing](../CONTRIBUTING.md)
