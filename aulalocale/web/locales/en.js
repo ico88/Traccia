@@ -320,3 +320,4 @@ window.TracciaLocales = {
     "Questo controllo non modifica i file. Gli originali non vengono mai spostati automaticamente.": "This check does not change files. Original recordings are never moved automatically."
   }
 };
+Object.assign(window.TracciaLocales.en,{'Vai al contenuto':'Skip to content'});
