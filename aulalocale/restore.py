@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory
 import argparse
 import hashlib
 import json
+import math
 import os
 import shutil
 import sqlite3
@@ -24,7 +25,7 @@ def restore(backup:Path,destination:Path):
         if info.file_size>20*1024**2:raise ValueError('Manifest too large')
         manifest=json.loads(bundle.read('manifest.json'))
         from . import ARCHIVE_SCHEMA
-        if manifest.get('schema') not in {5,ARCHIVE_SCHEMA}:raise ValueError('Unsupported backup schema')
+        if manifest.get('schema') not in {5,6,ARCHIVE_SCHEMA}:raise ValueError('Unsupported backup schema')
         expected=manifest.get('files',{})
         if set(names)!={'manifest.json',*expected} or 'aulalocale.sqlite3' not in expected:raise ValueError('Manifest does not match archive')
         staging=Path(temp)/'archive';staging.mkdir()
@@ -42,7 +43,9 @@ def restore(backup:Path,destination:Path):
             if c.execute('PRAGMA integrity_check').fetchone()[0]!='ok':raise ValueError('Database integrity check failed')
             if c.execute('PRAGMA user_version').fetchone()[0]!=manifest['schema']:raise ValueError('Database schema mismatch')
             if c.execute('PRAGMA foreign_key_check').fetchall():raise ValueError('Broken database references')
-            for table in ['subjects','lessons','audio_jobs','study_jobs','transcripts','notes','materials']:
+            tables=['subjects','lessons','audio_jobs','study_jobs','transcripts','notes','materials']
+            if manifest['schema']>=7:tables+=['archive_identity','note_templates','subject_preferences','lecture_annotations','study_questions']
+            for table in tables:
                 for (identifier,) in c.execute('SELECT id FROM '+table):
                     try:valid=str(UUID(identifier))==identifier
                     except (ValueError,TypeError,AttributeError):valid=False
@@ -56,6 +59,9 @@ def restore(backup:Path,destination:Path):
                 if 'evidence/'+identifier+'.json' not in expected:raise ValueError('Missing evidence review')
             for identifier,filename in c.execute('SELECT id,filename FROM materials'):
                 if filename!=identifier+'.png' or 'materials/'+filename not in expected:raise ValueError('Invalid image reference')
+            if manifest['schema']>=7:
+                for start,duration,material_subject,lesson_subject in c.execute('SELECT a.start,l.duration_seconds,m.subject_id,l.subject_id FROM lecture_annotations a JOIN lessons l ON a.lesson_id=l.id LEFT JOIN materials m ON a.material_id=m.id'):
+                    if not math.isfinite(start) or not 0<=start<=duration or material_subject is not None and material_subject!=lesson_subject:raise ValueError('Invalid lecture annotation reference')
             # A portable backup is data, not authorization to execute stored jobs.
             for table in ['audio_jobs','study_jobs']:
                 c.execute("UPDATE "+table+" SET status='cancelled',error='Restored from backup: start a new job explicitly' WHERE status IN ('queued','running','interrupted')")

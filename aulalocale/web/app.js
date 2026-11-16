@@ -1,9 +1,10 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
-let subjects = [], selected = null, lessons = [], loadingVersion = 0, noticeTimer;
+const workspaceLaunchHash=window.location.hash;
+let subjects = [], selected = null, lessons = [], loadingVersion = 0, noticeTimer, workspaceBooting=true;
 let selectedAudio = null, previewController = null, previewVersion = 0, importing = false;
 let autoFields = {};
-let currentLesson = null, currentAudioJob = null, audioPollTimer = null, audioSourceVersion = 0;
+let currentLesson = null, currentAudioJob = null, audioPollTimer = null, audioSourceVersion = 0, lessonOpenSequence=0;
 function notify(message, error = false) {
   $('notice').textContent = message;
   $('notice').classList.toggle('error', error);
@@ -12,6 +13,7 @@ function notify(message, error = false) {
   noticeTimer = setTimeout(() => { $('notice').hidden = true; }, error ? 10000 : 5000);
 }
 function signedOut() {
+  if(typeof resetWorkspaceSession==='function')resetWorkspaceSession();
   resetAudioState();
   $('player').pause(); $('player').removeAttribute('src'); $('player').load();
   $('player-panel').hidden = true;
@@ -24,12 +26,12 @@ async function request(path, options = {}) {
   let response;
   const {allowMissing = false, ...fetchOptions} = options;
   try { response = await fetch(path, {credentials: 'same-origin', ...fetchOptions}); }
-  catch (error) { if (error.name === 'AbortError') throw error; throw new Error(T('Connessione interrotta. Verifica che AulaLocale sia in esecuzione.')); }
+  catch (error) { if (error.name === 'AbortError') throw error; throw new Error(T('Connessione interrotta. Verifica che Traccia sia in esecuzione.')); }
   if (response.status === 401) { signedOut(); throw new Error(T('Accesso richiesto. Inserisci il token locale.')); }
   if (response.status === 404 && allowMissing) return null;
   if (!response.ok) {
     let detail; try { detail = (await response.json()).detail; } catch { /* generic below */ }
-    if (response.status === 409) throw new Error(typeof detail === 'string' ? detail : T('Questa registrazione è già presente nella materia.'));
+    if (response.status === 409) {const error=new Error(typeof detail === 'string' ? detail : T('Questa registrazione è già presente nella materia.'));error.status=409;error.detail=detail;throw error;}
     if (response.status === 413) throw new Error(T('Il file supera il limite di 512 MiB.'));
     if (response.status === 422) throw new Error(typeof detail === 'string' ? detail : T('Controlla i campi e il formato audio.'));
     if (response.status === 507) throw new Error(T('Impossibile salvare: controlla spazio libero e permessi.'));
@@ -43,6 +45,7 @@ async function allPages(path) {
   return items;
 }
 function duration(seconds) {
+  if(seconds>0 && seconds<60)return `${Math.max(1,Math.round(seconds))} s`;
   const mins = Math.round(seconds / 60);
   return mins >= 60 ? `${Math.floor(mins / 60)} h ${mins % 60} min` : `${mins} min`;
 }
@@ -61,10 +64,12 @@ function renderSubjects() {
 function renderLessons() {
   $('lessons').replaceChildren();
   $('empty').hidden = lessons.length > 0;
+  $('library-message').hidden=true;$('library-message').className='';
   $('lesson-count').textContent = lessons.length;
   $('total-duration').textContent = duration(lessons.reduce((sum, l) => sum + l.duration_seconds, 0));
   const query = $('lesson-search').value.trim().toLocaleLowerCase(I18n.locale);
   const visible = lessons.filter(lesson => [lesson.title,lesson.teacher,lesson.lecture_date || ''].join(' ').toLocaleLowerCase(I18n.locale).includes(query));
+  if(lessons.length && !visible.length){$('library-message').hidden=false;$('library-message').textContent=T('Nessuna lezione corrisponde alla ricerca.');}
   for (const lesson of visible) {
     const card = document.createElement('article'); card.className = 'lesson-card' + (currentLesson && currentLesson.id === lesson.id ? ' active' : '');
     const play = document.createElement('button'); play.className = 'play-button'; play.textContent = '▶';
@@ -81,7 +86,7 @@ function renderLessons() {
   }
 }
 async function selectSubject(id) {
-  if (typeof mayLeaveTranscript === 'function' && !mayLeaveTranscript()) return;
+  if (typeof mayLeaveTranscript === 'function' && !mayLeaveTranscript()) return false;
   const version = ++loadingVersion;
   resetAudioState();
   if (typeof showStudyView === 'function') showStudyView('library');
@@ -97,9 +102,14 @@ async function selectSubject(id) {
     const result = await allPages(`/api/v1/subjects/${encodeURIComponent(id)}/lessons`);
     if (version !== loadingVersion) return;
     lessons = result; renderLessons();
-  } finally { if (version === loadingVersion) $('list-status').textContent = ''; }
+    if(typeof resetQuestionsForCourse==='function')resetQuestionsForCourse();
+    if(typeof loadCoursePreferences==='function')await loadCoursePreferences(id);
+  } catch(error){if(version===loadingVersion){$('library-message').hidden=false;$('library-message').textContent=error.message;$('library-message').className='workspace-error';}throw error;} finally { if (version === loadingVersion) $('list-status').textContent = ''; }
+  return true;
 }
 async function openWorkspace() {
+  $('workspace').setAttribute('aria-busy','true');
+  try{
   subjects = await allPages('/api/v1/subjects');
   $('login-view').hidden = true; $('workspace').hidden = false;
   renderSubjects();
@@ -109,6 +119,7 @@ async function openWorkspace() {
     $('subject-title').textContent = T('Il tuo spazio di studio');
     $('subject-description').textContent = T('Una materia alla volta, una lezione dopo l’altra.');
   }
+  }finally{if(!workspaceBooting)$('workspace').setAttribute('aria-busy','false');}
 }
 $('login-form').onsubmit = async event => {
   event.preventDefault(); const button = event.submitter; button.disabled = true;
@@ -135,14 +146,14 @@ const suggestionFields = {'title':'lesson-title','teacher':'teacher','lecture_da
 function clearSelection() {
   selectedAudio = null; autoFields = {}; previewVersion++;
   if (previewController) previewController.abort();
-  $('selected-file').textContent = T('MP3, WAV, M4A o FLAC · massimo 512 MiB');
+  $('selected-file').textContent = T('MP3, MP4, WAV, M4A o FLAC · massimo 512 MiB');
   $('suggestion-status').textContent = T('Titolo, data e docente saranno proposti dal nome e dai metadati, quando disponibili.');
 }
 async function chooseAudio(file) {
   if (importing || !file) return;
-  if (!/\.(mp3|wav|m4a|flac)$/i.test(file.name) || file.size > 512 * 1024 * 1024) {
+  if (!/\.(mp3|mp4|wav|m4a|flac)$/i.test(file.name) || file.size > 512 * 1024 * 1024) {
     clearSelection(); $('audio-file').value = '';
-    notify(T('Scegli un MP3, WAV, M4A o FLAC fino a 512 MiB.'), true); return;
+    notify(T('Scegli un MP3, MP4, WAV, M4A o FLAC fino a 512 MiB.'), true); return;
   }
   const version = ++previewVersion;
   if (previewController) previewController.abort();
@@ -214,6 +225,8 @@ $('upload-form').onsubmit = async event => {
   finally { importing = false; $('audio-file').disabled = false; button.disabled = false; $('upload-status').textContent = T('L’originale sarà conservato senza modifiche.'); }
 };
 function resetAudioState() {
+  lessonOpenSequence++;
+  if(typeof clearLessonWorkspace==='function')clearLessonWorkspace();
   if(typeof resetPreview==='function')resetPreview();
   if (typeof resetStudy === 'function') resetStudy();
   currentLesson = null; currentAudioJob = null; audioSourceVersion++;
@@ -275,10 +288,15 @@ async function switchAudio(improved, keepPosition = true, autoplay = null) {
 }
 async function openLesson(lesson, autoplay = false) {
   if (typeof mayLeaveTranscript === 'function' && !mayLeaveTranscript()) return false;
-  resetAudioState(); currentLesson = lesson; $('preview-end').value=Math.min(20,lesson.duration_seconds); renderLessons();
-  $('playing-title').textContent = lesson.title; $('player-panel').hidden = false;
+  const opener=document.activeElement;
+  resetAudioState();const sequence=lessonOpenSequence; currentLesson = lesson; $('preview-end').value=Math.min(20,lesson.duration_seconds); renderLessons();
+  $('playing-title').textContent = lesson.title; $('player-panel').hidden = false;$('player-panel').setAttribute('aria-busy','true');
   renderAudioJob(); switchAudio(false,false,autoplay);
-  try { await refreshAudioJob(); await loadStudy();await loadSpeakers(); } catch(e) { notify(e.message,true); }
+  if(typeof resetLessonWorkspace==='function')resetLessonWorkspace(lesson);
+  try { await refreshAudioJob(); if(sequence!==lessonOpenSequence)return false;await loadStudy();if(sequence!==lessonOpenSequence)return false;await loadSpeakers(); } catch(e) { if(sequence===lessonOpenSequence)notify(e.message,true); }
+  finally{if(sequence===lessonOpenSequence)$('player-panel').setAttribute('aria-busy','false');}
+  if(sequence!==lessonOpenSequence)return false;
+  if(document.activeElement===document.body || document.activeElement===opener){$('playing-title').tabIndex=-1;$('playing-title').focus({preventScroll:true});$('player-panel').scrollIntoView({block:'start'});}
   return true;
 }
 $('source-original').onclick = () => switchAudio(false);
@@ -306,6 +324,8 @@ $('cancel-enhancement').onclick = async () => {
 $('speed').onchange = () => { $('player').playbackRate = Number($('speed').value); };
 $('player').onerror = () => { if ($('player').getAttribute('src')) notify(T('Audio non disponibile o formato non riproducibile dal browser. Prova a riaprire la sessione.'), true); };
 async function bootstrapWorkspace() {
+  $('workspace').setAttribute('aria-busy','true');
+  if(document.readyState==='loading' || document.readyState==='interactive')await new Promise(resolve=>document.addEventListener('DOMContentLoaded',resolve,{once:true}));
   const access = new URLSearchParams(window.location.hash.slice(1)).get('access');
   if (access) {
     window.history.replaceState(null, '', window.location.pathname);
@@ -315,13 +335,14 @@ async function bootstrapWorkspace() {
   const environment=await request('/api/v1/environment');
   window.tracciaDesktop=environment.desktop;
   $('quit-desktop').hidden=!environment.desktop;
+  if(typeof restoreWorkspaceRoute==='function')await restoreWorkspaceRoute();
 }
 $('quit-desktop').onclick=async()=>{
   if (typeof mayLeaveTranscript === 'function' && !mayLeaveTranscript()) return;
-  try {await request('/api/v1/shutdown',{method:'POST'});signedOut();notify(T('AulaLocale è stata chiusa. Puoi chiudere questa scheda.'));}
+  try {await request('/api/v1/shutdown',{method:'POST'});signedOut();notify(T('Traccia è stata chiusa. Puoi chiudere questa scheda.'));}
   catch(e){notify(e.message,true);}
 };
-bootstrapWorkspace().catch(e => { if (!$('login-view').hidden) return; notify(e.message, true); });
+bootstrapWorkspace().catch(e => { if (!$('login-view').hidden) return; notify(e.message, true); }).finally(()=>{workspaceBooting=false;$('workspace').setAttribute('aria-busy','false');});
 
 $('lesson-search').oninput = renderLessons;
 

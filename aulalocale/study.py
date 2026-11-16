@@ -122,10 +122,14 @@ class StudyEngine:
         with closing(self.connect()) as c:
             row=c.execute('SELECT * FROM study_jobs WHERE id=?',(str(identifier),)).fetchone()
         if not row:raise HTTPException(404,'Study job not found')
-        record=dict(row);record.pop('payload');return record
+        record=dict(row);payload=json.loads(record.pop('payload'));
+        if record['kind']=='pipeline':record['stage']=payload.get('stage','transcription')
+        return record
 
-    def update(self,identifier,status,progress=0,error=None):
+    def update(self,identifier,status,progress=0,error=None,final=False):
         with closing(self.connect()) as c,c:
+            kind=c.execute('SELECT kind FROM study_jobs WHERE id=?',(identifier,)).fetchone()
+            if status=='completed' and kind and kind[0]=='pipeline' and not final:return
             c.execute("UPDATE study_jobs SET status=?,progress=?,error=?,updated_at=? WHERE id=? AND (status!='cancelled' OR ?='cancelled')",(status,progress,error,timestamp(),identifier,status))
 
     def next(self):
@@ -170,10 +174,14 @@ class StudyEngine:
                 if job['kind']=='transcription':self.transcribe(job,Path(temp))
                 elif job['kind']=='speakers':self.speakers.execute(job,Path(temp),self)
                 elif job['kind']=='evidence':self.evidence.execute(job,Path(temp))
+                elif job['kind']=='question':self.questions.execute(job,Path(temp))
+                elif job['kind']=='pipeline':
+                    from .workspace import execute_pipeline
+                    execute_pipeline(self,job,Path(temp))
                 else:self.generate_notes(job,Path(temp))
             with self.worker.lock:
                 if self.cancelled(identifier):raise InterruptedError()
-                self.update(identifier,'completed',100)
+                self.update(identifier,'completed',100,final=True)
         except InterruptedError:
             if self.get(identifier)['status']!='cancelled':self.update(identifier,'interrupted')
         except Exception as error:
@@ -214,6 +222,8 @@ class StudyEngine:
         model=self.models.require('whisper-turbo');binary=runtime_path('whisper-cli')
         if not binary:raise ValueError('Runtime Whisper non installato.')
         context=('Lezione universitaria di '+subject['title']+'. '+lesson['title']+'. '+subject['description'])[:400]
+        glossary=options.get('glossary',[])
+        if glossary:context=(context+' Terminologia: '+', '.join(glossary))[:1200]
         total=lesson['duration_seconds'];segments=[]
         chunk_seconds=600
         for number,start in enumerate(range(0,max(1,int(total+.999)),chunk_seconds)):
@@ -232,7 +242,7 @@ class StudyEngine:
         if not segments:raise ValueError('Nessun parlato riconosciuto. Controlla il contenuto audio.')
         metadata={'engine':'whisper.cpp','runtime':subprocess.run([binary,'--version'],capture_output=True,text=True,timeout=10).stdout.strip(),
                   'model':'whisper-turbo','sha256':self.models.status()[0]['sha256'],'language':options['language'],
-                  'source':'enhanced' if options.get('audio_job_id') else 'original','audio_job_id':options.get('audio_job_id'),'source_recipe':source_recipe,'chunk_seconds':chunk_seconds,'manual':False,'context':context}
+                  'source':'enhanced' if options.get('audio_job_id') else 'original','audio_job_id':options.get('audio_job_id'),'source_recipe':source_recipe,'chunk_seconds':chunk_seconds,'manual':False,'context':context,'pipeline_job':options.get('pipeline_job')}
         with self.worker.lock:
             if self.cancelled(job['id']):raise InterruptedError()
             with closing(self.connect()) as c,c:
@@ -248,7 +258,8 @@ class StudyEngine:
         prompt_file=temp/'prompt.txt';result_file=temp/'answer.txt';grammar_file=temp/'notes.gbnf'
         prompt_file.write_text(prompt)
         from .evidence import CHECK_GRAMMAR
-        grammar=CHECK_GRAMMAR if mode=='evidence' else ROUTE_GRAMMAR if mode=='route' else MERGE_GRAMMAR if mode=='merge' else NOTES_GRAMMAR
+        from .questions import QUESTION_GRAMMAR
+        grammar=QUESTION_GRAMMAR if mode=='question' else CHECK_GRAMMAR if mode=='evidence' else ROUTE_GRAMMAR if mode=='route' else MERGE_GRAMMAR if mode=='merge' else NOTES_GRAMMAR
         if citation_count:
             allowed=' | '.join(json.dumps(str(i)) for i in range(0 if mode=='route' else 1,citation_count+1))
             grammar=grammar.replace('integer ::= [1-9] [0-9]{0,5} ws','integer ::= ('+allowed+') ws')
@@ -274,6 +285,9 @@ class StudyEngine:
                 raise ValueError('La dispensa è cambiata: avvia una nuova proposta.')
         old=previous['chapters'] if previous else []
         working,selected,revisions=note_plan(old,snapshots)
+        if payload.get('force_template_rebuild'):
+            from copy import deepcopy
+            working=[deepcopy(chapter) for chapter in old if chapter.get('manual')];selected=snapshots
         if not selected:raise ValueError('Nessuna nuova trascrizione o fonte modificata da integrare.')
         source_text={ref_key({'lesson_id':t['lesson_id'],'revision_id':t['id'],'segment_id':s['id']}):s['text'] for t in snapshots for s in t['segments']}
         def ask(mode,data,count):
@@ -298,6 +312,7 @@ Restituisci JSON con chapters: al massimo 2 sezioni, ognuna con title breve, tex
 Se un passaggio è incomprensibile, segnalalo come passaggio da verificare, senza ricostruirlo.
 Non aggiungere conoscenze esterne, dosaggi o conclusioni non presenti. Mantieni le incertezze della fonte. Non inventare formule. Cita soltanto id esistenti.
 SEGMENTI:\n'''+json.dumps(rows,ensure_ascii=False)
+            if payload.get('template'):prompt+='\nFORMATO RICHIESTO (senza aggiungere fatti):\n'+str(payload['template']['prompt'])[:4000]
             answer=self.llm(prompt,temp,job['id'],len(group))
             for chapter in answer.get('chapters',[]):
                 citations=chapter.get('citations',[])
@@ -306,7 +321,7 @@ SEGMENTI:\n'''+json.dumps(rows,ensure_ascii=False)
                 title=str(chapter.get('title','')).strip();text=str(chapter.get('text','')).strip()
                 if not title or not text:raise ValueError('Risposta del modello incompleta.')
                 refs=[{'lesson_id':transcript['lesson_id'],'revision_id':transcript['id'],'segment_id':group[i-1]['id'],'start':group[i-1]['start']} for i in dict.fromkeys(citations)]
-                new.append({'id':str(uuid4()),'title':title[:200],'text':text[:30000],'sources':refs,'manual':False,'generation':{'model':'qwen3-4b','language':payload.get('language','it'),'recipe':RECIPE,'covered_revisions':revisions}})
+                new.append({'id':str(uuid4()),'title':title[:200],'text':text[:30000],'sources':refs,'manual':False,'generation':{'model':'qwen3-4b','language':payload.get('language','it'),'recipe':RECIPE,'covered_revisions':revisions,'pipeline_job':payload.get('pipeline_job'),'template':payload.get('template')}})
             self.update(job['id'],'running',(index+1)/max(1,len(chunks))*65)
         if not new:raise ValueError('Nessun contenuto generato.')
         for number,chapter in enumerate(new):
@@ -314,7 +329,7 @@ SEGMENTI:\n'''+json.dumps(rows,ensure_ascii=False)
             consolidate(working,chapter,ask,source_text)
             self.update(job['id'],'running',65+(number+1)/len(new)*34)
         for chapter in working:
-            if not chapter.get('manual'):chapter['generation']={**chapter.get('generation',{}),'recipe':RECIPE,'covered_revisions':revisions}
+            if not chapter.get('manual'):chapter['generation']={**chapter.get('generation',{}),'recipe':RECIPE,'covered_revisions':revisions,'pipeline_job':payload.get('pipeline_job'),'template':payload.get('template')}
         with self.worker.lock:
             if self.cancelled(job['id']):raise InterruptedError()
             with closing(self.connect()) as c,c:
@@ -331,8 +346,12 @@ def study_router(engine,authenticate):
     def require_subject(c,identifier):
         if not c.execute('SELECT 1 FROM subjects WHERE id=?',(str(identifier),)).fetchone():raise HTTPException(404,'Subject not found')
     def enqueue(kind,subject_id,lesson_id,payload):
+        if kind=='transcription':
+            from .workspace import preferences
+            with closing(connect()) as c:payload['glossary']=preferences(c,subject_id)['settings']['glossary']
         with engine.worker.lock:
             with closing(connect()) as c,c:
+                if c.execute("SELECT 1 FROM study_jobs WHERE kind='pipeline' AND subject_id=? AND status IN ('queued','running','interrupted')",(subject_id,)).fetchone():raise HTTPException(409,'A complete workflow is active for this subject')
                 existing=c.execute("SELECT * FROM study_jobs WHERE kind=? AND subject_id=? AND COALESCE(lesson_id,'')=? AND status IN ('queued','running')",(kind,subject_id,lesson_id or '')).fetchone()
                 if existing:return engine.get(existing['id'])
                 identifier=str(uuid4());now=timestamp()
@@ -419,7 +438,7 @@ def study_router(engine,authenticate):
         return engine.get(job_id)
 
     @router.post('/subjects/{subject_id}/notes/generate',status_code=202)
-    def generate(subject_id:UUID,language:Literal['it','en']='it'):
+    def generate(subject_id:UUID,language:Literal['it','en']='it',template_id:UUID|None=None):
         engine.models.require('qwen3-4b')
         if not runtime_path('llama-cli'):raise HTTPException(409,'Runtime llama.cpp non installato')
         with closing(connect()) as c:
@@ -427,9 +446,13 @@ def study_router(engine,authenticate):
             lessons=c.execute('SELECT id FROM lessons WHERE subject_id=? ORDER BY created_at,id',(str(subject_id),)).fetchall()
             transcripts=[t for row in lessons if (t:=latest_transcript(c,row['id']))]
             old=latest_notes(c,subject_id)
+            from .workspace import preferences,template_snapshot
+            chosen=template_id or preferences(c,subject_id)['settings'].get('template_id')
+            template=template_snapshot(c,chosen)
         if not transcripts:raise HTTPException(409,'Trascrivi almeno una lezione prima di generare la dispensa.')
-        if old and not note_plan(old['chapters'],transcripts)[1]:raise HTTPException(409,'La dispensa include già tutte le trascrizioni correnti. Aggiungi o correggi una lezione prima di aggiornarla.')
-        return enqueue('notes',str(subject_id),None,{'base_revision':old['id'] if old else None,'transcripts':transcripts,'language':language})
+        template_changed=bool(old and any(ch.get('generation',{}).get('template')!=template for ch in old['chapters']))
+        if old and not template_changed and not note_plan(old['chapters'],transcripts)[1]:raise HTTPException(409,'La dispensa include già tutte le trascrizioni correnti. Aggiungi o correggi una lezione prima di aggiornarla.')
+        return enqueue('notes',str(subject_id),None,{'base_revision':old['id'] if old else None,'transcripts':transcripts,'language':language,'template':template,'force_template_rebuild':template_changed})
 
     @router.get('/subjects/{subject_id}/notes/revisions')
     def note_revisions(subject_id:UUID,limit:int=Query(50,ge=1,le=200),offset:int=Query(0,ge=0)):
@@ -452,7 +475,7 @@ def study_router(engine,authenticate):
             require_subject(c,subject_id)
             current=latest_notes(c,subject_id)
             proposals=[note_record(row) for row in c.execute('SELECT * FROM notes WHERE subject_id=? AND accepted=0 ORDER BY created_at DESC,id DESC',(str(subject_id),))]
-            jobs=[engine.get(row['id']) for row in c.execute("SELECT id FROM study_jobs WHERE subject_id=? AND kind='notes' ORDER BY created_at DESC",(str(subject_id),))]
+            jobs=[engine.get(row['id']) for row in c.execute("SELECT id FROM study_jobs WHERE subject_id=? AND kind IN ('notes','pipeline') ORDER BY created_at DESC,id DESC",(str(subject_id),))]
             heads={row['id']:(latest_transcript(c,row['id']) or {}).get('id') for row in c.execute('SELECT id FROM lessons WHERE subject_id=?',(str(subject_id),))}
         for record in [current,*proposals]:
             if record:

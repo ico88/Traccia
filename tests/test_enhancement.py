@@ -182,4 +182,4 @@ def test_second_instance_does_not_migrate_an_open_archive(tmp_path):
             with TestClient(create_app(tmp_path,TOKEN)):pass
         with sqlite3.connect(tmp_path/'aulalocale.sqlite3') as c:
             assert c.execute('PRAGMA user_version').fetchone()[0]==5
-            c.execute('PRAGMA user_version=6')
+            c.execute('PRAGMA user_version=7')

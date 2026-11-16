@@ -21,5 +21,5 @@ s=session('fr','it-IT');assert.equal(s.context.document.documentElement.lang,'it
 s=session(null,'fr-FR',false);assert.equal(s.context.document.documentElement.lang,'en');
 s=session('en');s.context.isRecording=()=>true;s.nodes.get('interface-language').value='it';s.nodes.get('interface-language').onchange();assert.equal(s.context.reloaded,undefined);assert.equal(s.nodes.get('interface-language').value,'en');
 s=session('en');s.context.mayLeaveTranscript=()=>false;s.nodes.get('interface-language').value='it';s.nodes.get('interface-language').onchange();assert.equal(s.context.reloaded,undefined);
-for(const file of ['app.js','study.js','speakers.js','recording.js','pcm-recorder.js','preview.js'])new vm.Script(fs.readFileSync(new URL(file,folder),'utf8'),{filename:file});
+for(const file of ['app.js','study.js','speakers.js','recording.js','pcm-recorder.js','preview.js','workspace.js','workspace-import.js','workspace-settings.js','workspace-templates.js','workspace-context.js','workspace-search.js','workspace-pipeline.js','workspace-questions.js','workspace-export.js'])new vm.Script(fs.readFileSync(new URL(file,folder),'utf8'),{filename:file});
 console.log('i18n: English/Italian, fallback, persistence, safe interpolation, user content and recording/unsaved-change guards passed');

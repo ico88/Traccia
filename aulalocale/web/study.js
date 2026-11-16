@@ -5,21 +5,25 @@ const TRANSCRIPT_PAGE_SIZE = 40;
 let reviewCursor=null, previewRange=null, transcriptSaving=false;
 let activeStudyJob = null, activeView = 'library', notesTimer = null, modelsTimer = null;
 let currentNotes = null, editingChapter = null, historicalNotes=null;
-function mayLeaveTranscript() { return (!transcriptDirty && !window.aulalocaleSpeakersDirty) || window.confirm(T('Ci sono correzioni non salvate. Vuoi abbandonarle?')); }
+function mayLeaveTranscript() { return (!transcriptDirty && !window.aulalocaleSpeakersDirty && !(typeof workspaceHasUnsavedChanges==='function' && workspaceHasUnsavedChanges())) || window.confirm(T('Ci sono correzioni non salvate. Vuoi abbandonarle?')); }
 const readableTime = seconds => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2,'0')}`;
 function resetStudy() {
   if(typeof resetSpeakers==='function')resetSpeakers();
   clearTimeout(studyTimer); reviewCursor=null;previewRange=null;$('transcription-source').value='original';$('transcript-search').value='';$('only-unreviewed').checked=false;$('repeat-passage').checked=false; transcriptPage=0;historicalTranscript=false;transcriptHead=null;$('transcript-pagination').hidden=true;$('transcript-history').replaceChildren();$('transcript-history').disabled=true; currentTranscript = null; transcriptDirty = false; activeStudyJob = null;
   $('transcript-segments').replaceChildren(); $('transcript-review-summary').textContent='';$('transcript-provenance').textContent='';$('next-unreviewed').disabled=true; $('save-transcript').hidden = true;
   $('study-progress').hidden = true; $('cancel-study').hidden = true;
+  if(typeof updateTranscriptExport==='function')updateTranscriptExport();
   $('transcript-revision').textContent = ''; $('transcript-status').textContent = T('Trascrizione italiana con timestamp e correzioni manuali.');
   $('transcribe-lesson').disabled = false; $('transcribe-lesson').hidden = false; $('transcribe-lesson').textContent=T('Trascrivi sul dispositivo');
 }
 function showStudyView(view) {
+  if(view!=='library')$('preview-player').pause();
   activeView = view; clearTimeout(notesTimer); clearTimeout(modelsTimer);
-  for (const name of ['library','notes','models']) $(name+'-view').hidden = name !== view;
+  for (const name of ['library','notes','models','search','templates','preferences']) if($(name+'-view'))$(name+'-view').hidden = name !== view;
   $('view-library').setAttribute('aria-pressed',String(view === 'library'));
   $('view-notes').setAttribute('aria-pressed',String(view === 'notes'));
+  for(const name of ['search','templates','preferences'])if($('view-'+name))$('view-'+name).setAttribute('aria-pressed',String(view===name));
+  if(typeof workspaceRoute==='function')workspaceRoute(view);
 }
 $('view-library').onclick = () => showStudyView('library');
 $('view-notes').onclick = () => { showStudyView('notes'); loadNotes().catch(e=>notify(e.message,true)); };
@@ -47,6 +51,7 @@ async function listenSegment(segment){
   try{await $('player').play();}catch{notify(T('Premi Play per riascoltare il passaggio.'),true);}
 }
 function renderTranscript() {
+  if(typeof updateTranscriptExport==='function')updateTranscriptExport();
   $('transcript-segments').replaceChildren();
   renderReviewSummary();if (!currentTranscript) return;
   $('transcript-revision').textContent=(historicalTranscript?T('Storica · '):T('Revisione '))+currentTranscript.revision;
@@ -80,10 +85,11 @@ async function loadStudy() {
   $('cancel-study').hidden=!activeStudyJob; $('study-progress').hidden=!activeStudyJob;
   if (activeStudyJob) {
     $('study-progress').value=activeStudyJob.progress;
-    $('transcript-status').textContent=activeStudyJob.status==='queued'?T('In coda: attendo il motore locale.'):T`${activeStudyJob.kind==='speakers'?T('Analisi parlanti'):T('Trascrizione')} in corso · ${Math.floor(activeStudyJob.progress)}%. L’avanzamento si aggiorna al termine di ogni blocco.`;
+    $('transcript-status').textContent=activeStudyJob.kind==='question'?T('Domanda in elaborazione sul dispositivo.'):activeStudyJob.kind==='pipeline'?(activeStudyJob.stage==='notes'?T('Fase: proposta dispensa'):T('Fase: trascrizione'))+' · '+Math.floor(activeStudyJob.progress)+'%':activeStudyJob.status==='queued'?T('In coda: attendo il motore locale.'):T`${activeStudyJob.kind==='speakers'?T('Analisi parlanti'):T('Trascrizione')} in corso · ${Math.floor(activeStudyJob.progress)}%. L’avanzamento si aggiorna al termine di ogni blocco.`;
     studyTimer=setTimeout(()=>loadStudy().catch(e=>notify(e.message,true)),2000);
   } else if (currentTranscript) $('transcript-status').textContent=historicalTranscript?T('Revisione storica in sola lettura. Scegli l’ultima revisione per modificare.'):T('Testo automatico da verificare ascoltando i timestamp. Le correzioni vengono salvate in una nuova revisione.');
   else $('transcript-status').textContent=jobs[0] && jobs[0].status==='failed'?jobs[0].error:T('Whisper Turbo · italiano · elaborazione sul dispositivo. Installa il modello nella sezione Modelli locali.');
+  if($('start-workflow')){$('start-workflow').disabled=Boolean(activeStudyJob || transcriptDirty || historicalTranscript || currentTranscript?.metadata.manual);const pipeline=jobs.find(job=>job.kind==='pipeline');if(pipeline)$('workflow-status').textContent=pipeline.status==='completed'?T('Proposta pronta: apri Dispensa per verificarla.'):pipeline.error || (pipeline.stage==='notes'?T('Fase: proposta dispensa'):T('Fase: trascrizione'));}
 }
 $('transcribe-lesson').onclick=async()=>{
   if (!currentLesson)return;
@@ -161,7 +167,7 @@ async function loadNotes(){
   currentNotes=historicalNotes || result.current;$('notes-history').value=currentNotes?.id || '';
   $('notes-history-status').textContent=historicalNotes?T('Revisione storica in sola lettura. Esportazione e nuove proposte usano la versione attuale.'):'';
   $('generate-source-map').hidden=!currentNotes || Boolean(historicalNotes);$('generate-outline').hidden=!currentNotes || Boolean(historicalNotes);$('notes-content').replaceChildren();$('notes-proposals').replaceChildren();
-  const active=result.jobs.find(job=>job.kind==='notes' && ['queued','running','interrupted'].includes(job.status));
+  const active=result.jobs.find(job=>['notes','pipeline'].includes(job.kind) && ['queued','running','interrupted'].includes(job.status));
   $('generate-notes').disabled=Boolean(active);
   $('notes-status').textContent=active?T`Aggiornamento in preparazione · ${Math.floor(active.progress)}%`:result.current && result.current.stale?T('Alcune fonti sono cambiate. Prepara un aggiornamento e controlla i riferimenti.'):!currentNotes?T('Trascrivi una lezione, poi prepara la prima proposta.'):T`Dispensa salvata · ${new Date(currentNotes.created_at).toLocaleString(I18n.locale)}`;
   if(!active && result.jobs[0] && result.jobs[0].status==='failed')$('notes-status').textContent=result.jobs[0].error;
@@ -189,7 +195,7 @@ async function loadNotes(){
 $('generate-notes').onclick=async()=>{if(!selected)return;$('generate-notes').disabled=true;try{await request(`/api/v1/subjects/${selected}/notes/generate?language=${$('notes-language').value}`,{method:'POST'});await loadNotes();}catch(e){notify(e.message,true);$('generate-notes').disabled=false;}};
 $('chapter-form').onsubmit=async event=>{event.preventDefault();if(!currentNotes || !editingChapter || historicalNotes)return;const button=event.submitter;button.disabled=true;try{await request(`/api/v1/subjects/${selected}/notes`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({base_revision:currentNotes.id,chapter_id:editingChapter.id,title:$('chapter-title').value,text:$('chapter-text').value})});$('chapter-dialog').close();await loadNotes();}catch(e){notify(e.message,true);}finally{button.disabled=false;}};
 $('print-notes').onclick=()=>window.print();
-window.addEventListener('beforeunload',event=>{if(transcriptDirty){event.preventDefault();event.returnValue='';}});
+window.addEventListener('beforeunload',event=>{if(transcriptDirty || typeof workspaceHasUnsavedChanges==='function' && workspaceHasUnsavedChanges() || typeof workspaceHasPendingImports==='function' && workspaceHasPendingImports()){event.preventDefault();event.returnValue='';}});
 
 async function loadMaterials(id){
   const images=await request(`/api/v1/subjects/${id}/materials`);if(selected!==id || activeView!=='notes')return;

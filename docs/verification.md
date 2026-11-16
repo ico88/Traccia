@@ -88,3 +88,8 @@ Browser and packaged Mac checks confirmed English/Italian switching. The Mac pre
 Real UI checks on public/synthetic demo material completed a five-second GTCRN preview, historical read-only selection, PDF figure import and source-map generation. Qwen completed a local four-claim source check and classified the unsupported demo claims as uncertain. That is a bounded functional trial, not a measured entailment benchmark. The packaged PDF subprocess extracted the synthetic figure successfully.
 
 The Linux Docker build and startup/auth/native-runtime smoke check passed on a GitHub-hosted runner. It is not an i7 performance measurement. No valid signing identities were found on the development Mac; no Developer ID signing/notarization or clean-second-Mac qualification is claimed.
+
+
+## Workspace build — 2026-11-16
+
+115 backend tests passed with installed GTCRN. Real UI imports, duplicate/corrupt-file handling, local Whisper→Qwen execution, student context, independent question abstention and bilingual labels were checked on a disposable archive. Local JavaScript/i18n checks passed. Native 390/1440 windows and responsive document widths were inspected; remaining qualification is explicitly recorded in [the build log](../replica/build-log.md). These are development checks, not a new stable release.

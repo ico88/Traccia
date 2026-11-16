@@ -137,7 +137,7 @@ window.TracciaLocales = {
     "Contenuto": "Content",
     "La sezione modificata viene protetta dagli aggiornamenti automatici.": "Your edited section is protected from automatic updates.",
     "Salva revisione": "Save revision",
-    "Connessione interrotta. Verifica che AulaLocale sia in esecuzione.": "Connection lost. Make sure Traccia is running.",
+    "Connessione interrotta. Verifica che Traccia sia in esecuzione.": "Connection lost. Make sure Traccia is running.",
     "Accesso richiesto. Inserisci il token locale.": "Access required. Enter the local token.",
     "Questa registrazione è già presente nella materia.": "This recording is already in this subject.",
     "Il file supera il limite di 512 MiB.": "The file exceeds the 512 MiB limit.",
@@ -172,7 +172,7 @@ window.TracciaLocales = {
     "La versione migliorata è già pronta.": "The enhanced version is already ready.",
     "Elaborazione avviata. Puoi continuare a usare l’archivio.": "Processing started. You can keep using your library.",
     "Audio non disponibile o formato non riproducibile dal browser. Prova a riaprire la sessione.": "Audio unavailable or unsupported by the browser. Try reopening the session.",
-    "AulaLocale è stata chiusa. Puoi chiudere questa scheda.": "Traccia has closed. You can close this tab.",
+    "Traccia è stata chiusa. Puoi chiudere questa scheda.": "Traccia has closed. You can close this tab.",
     "Ci sono correzioni non salvate. Vuoi abbandonarle?": "You have unsaved changes. Discard them?",
     "{{0}} di {{1}} passaggi rivisti all’ascolto{{2}}": "{{0}} of {{1}} passages reviewed by listening{{2}}",
     " · modifiche da salvare": " · unsaved changes",
@@ -320,3 +320,4 @@ window.TracciaLocales = {
     "Questo controllo non modifica i file. Gli originali non vengono mai spostati automaticamente.": "This check does not change files. Original recordings are never moved automatically."
   }
 };
+Object.assign(window.TracciaLocales.en,{'Vai al contenuto':'Skip to content'});
