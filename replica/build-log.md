@@ -29,7 +29,7 @@ Checkpoint: 2026-11-16, `sviluppo`, application 0.11.0.dev1, archive schema 7. R
 
 ## Evidence
 
-- 113 backend tests passed locally, including installed GTCRN integration tests.
+- 115 backend tests passed locally, including installed GTCRN integration tests.
 - Meaningful new tests cover stale preference/template revisions, annotation ranges/scope/retry identity, current-revision search, checkpoint recovery without duplicate transcripts/proposals, schema-6 upgrade, backup preservation, protected manual chapters on template change, question citation/quantity refusal, idempotent answer proposals, stale-source rejection and export revision/timing/speaker options.
 - English/Italian interpolation, persistence, recording/unsaved-change guards and JavaScript syntax checks passed through the Node runtime.
 - A real public speech fixture was imported through the UI, its duplicate skipped, and an MP4 audio container accepted. A corrupt WAV produced a persistent per-file error without changing completed imports.
@@ -46,3 +46,7 @@ Schema 7 adds five small tables, preserving the seven baseline tables and their 
 The proposed full architecture is implemented incrementally: import staging and FTS/thread tables remain unimplemented; current pipelines use existing durable jobs and questions use a compact archive-owned table. No duplicate scheduler, hosted inference, cloud storage, payment system or new model dependency was introduced.
 
 A new local ad-hoc Mac development package is built separately. The public README's tagged 0.10 download has not been replaced, and promotion of development code to main does not replace that tagged download. Developer ID signing/notarization, clean-Mac validation, real i7 benchmarks, multiuser isolation and manual quality evaluation remain outside this completion claim.
+
+## Promotion review fixes
+
+Question citations now record cited revisions separately from full-transcript coverage, so accepting a short answer cannot block later summarization of the remaining lecture. Course-note status includes pipeline jobs, with frontend regression coverage for progress polling, proposal refresh and failure feedback. The full backend suite passes 115 tests.

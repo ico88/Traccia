@@ -475,7 +475,7 @@ def study_router(engine,authenticate):
             require_subject(c,subject_id)
             current=latest_notes(c,subject_id)
             proposals=[note_record(row) for row in c.execute('SELECT * FROM notes WHERE subject_id=? AND accepted=0 ORDER BY created_at DESC,id DESC',(str(subject_id),))]
-            jobs=[engine.get(row['id']) for row in c.execute("SELECT id FROM study_jobs WHERE subject_id=? AND kind='notes' ORDER BY created_at DESC",(str(subject_id),))]
+            jobs=[engine.get(row['id']) for row in c.execute("SELECT id FROM study_jobs WHERE subject_id=? AND kind IN ('notes','pipeline') ORDER BY created_at DESC,id DESC",(str(subject_id),))]
             heads={row['id']:(latest_transcript(c,row['id']) or {}).get('id') for row in c.execute('SELECT id FROM lessons WHERE subject_id=?',(str(subject_id),))}
         for record in [current,*proposals]:
             if record:

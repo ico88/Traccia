@@ -167,7 +167,7 @@ async function loadNotes(){
   currentNotes=historicalNotes || result.current;$('notes-history').value=currentNotes?.id || '';
   $('notes-history-status').textContent=historicalNotes?T('Revisione storica in sola lettura. Esportazione e nuove proposte usano la versione attuale.'):'';
   $('generate-source-map').hidden=!currentNotes || Boolean(historicalNotes);$('generate-outline').hidden=!currentNotes || Boolean(historicalNotes);$('notes-content').replaceChildren();$('notes-proposals').replaceChildren();
-  const active=result.jobs.find(job=>job.kind==='notes' && ['queued','running','interrupted'].includes(job.status));
+  const active=result.jobs.find(job=>['notes','pipeline'].includes(job.kind) && ['queued','running','interrupted'].includes(job.status));
   $('generate-notes').disabled=Boolean(active);
   $('notes-status').textContent=active?T`Aggiornamento in preparazione · ${Math.floor(active.progress)}%`:result.current && result.current.stale?T('Alcune fonti sono cambiate. Prepara un aggiornamento e controlla i riferimenti.'):!currentNotes?T('Trascrivi una lezione, poi prepara la prima proposta.'):T`Dispensa salvata · ${new Date(currentNotes.created_at).toLocaleString(I18n.locale)}`;
   if(!active && result.jobs[0] && result.jobs[0].status==='failed')$('notes-status').textContent=result.jobs[0].error;

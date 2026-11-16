@@ -92,4 +92,4 @@ The Linux Docker build and startup/auth/native-runtime smoke check passed on a G
 
 ## Workspace build — 2026-11-16
 
-113 backend tests passed with installed GTCRN. Real UI imports, duplicate/corrupt-file handling, local Whisper→Qwen execution, student context, independent question abstention and bilingual labels were checked on a disposable archive. Local JavaScript/i18n checks passed. Native 390/1440 windows and responsive document widths were inspected; remaining qualification is explicitly recorded in [the build log](../replica/build-log.md). These are development checks, not a new stable release.
+115 backend tests passed with installed GTCRN. Real UI imports, duplicate/corrupt-file handling, local Whisper→Qwen execution, student context, independent question abstention and bilingual labels were checked on a disposable archive. Local JavaScript/i18n checks passed. Native 390/1440 windows and responsive document widths were inspected; remaining qualification is explicitly recorded in [the build log](../replica/build-log.md). These are development checks, not a new stable release.

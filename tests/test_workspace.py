@@ -150,3 +150,13 @@ def test_changing_template_prepares_new_proposal_and_preserves_manual_chapter(tm
         proposal=notes['proposals'][0];assert manual in proposal['chapters']
         assert all(ch['id']!=automatic['id'] for ch in proposal['chapters'])
         assert any(ch['generation'].get('template',{}).get('id')==template['id'] for ch in proposal['chapters'] if not ch['manual'])
+
+
+def test_course_note_status_includes_pipeline_jobs_and_failures(tmp_path):
+    sid,lid,rid,seg=seeded(tmp_path);identifier=str(uuid4())
+    with TestClient(create_app(tmp_path,TOKEN)) as client:
+        with sqlite3.connect(tmp_path/'aulalocale.sqlite3') as c:c.execute('INSERT INTO study_jobs VALUES (?,?,?,?,?,0,NULL,?,?,?)',(identifier,'pipeline',lid,sid,'interrupted',json.dumps({'stage':'notes'}),'2026-01-01','2026-01-01'))
+        route=f'/api/v1/subjects/{sid}/notes'
+        jobs=client.get(route,headers=AUTH).json()['jobs'];assert jobs[0]['id']==identifier and jobs[0]['kind']=='pipeline'
+        with sqlite3.connect(tmp_path/'aulalocale.sqlite3') as c:c.execute("UPDATE study_jobs SET status='failed',error='Pipeline stopped' WHERE id=?",(identifier,))
+        assert client.get(route,headers=AUTH).json()['jobs'][0]['error']=='Pipeline stopped'

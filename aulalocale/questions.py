@@ -144,7 +144,7 @@ def questions_router(service,authenticate):
                 if not transcript or transcript['id']!=citation['revision_id'] or not lesson or lesson['subject_id']!=row['subject_id'] or not segment or normalized(citation['quote']) not in normalized(segment['text']):raise HTTPException(409,'A cited source changed; ask again before saving')
                 refs.append({k:citation[k] for k in ['lesson_id','revision_id','segment_id','start']});revisions[citation['lesson_id']]=citation['revision_id']
             chapters=deepcopy(previous['chapters']) if previous else [];question=json.loads(row['request'])['question']
-            chapters.append({'id':str(uuid4()),'title':question[:200],'text':result['answer'],'manual':False,'sources':refs,'generation':{'model':'qwen3-4b','question_id':str(identifier),'covered_revisions':revisions,'recipe':'source-question-v1'}})
+            chapters.append({'id':str(uuid4()),'title':question[:200],'text':result['answer'],'manual':False,'sources':refs,'generation':{'model':'qwen3-4b','question_id':str(identifier),'cited_revisions':revisions,'recipe':'source-question-v1'}})
             note_id=str(uuid4());c.execute('INSERT INTO notes VALUES (?,?,?,?,0,?)',(note_id,row['subject_id'],previous['id'] if previous else None,json.dumps(chapters),timestamp()))
             c.execute('UPDATE study_questions SET saved_note_id=?,updated_at=? WHERE id=?',(note_id,timestamp(),str(identifier)))
             return {'id':note_id,'accepted':False}

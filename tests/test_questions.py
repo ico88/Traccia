@@ -22,6 +22,7 @@ def fake_answers(monkeypatch,tmp_path):
     monkeypatch.setattr(ModelManager,'require',lambda self,key:tmp_path/'model')
     monkeypatch.setattr('aulalocale.questions.runtime_path',lambda name:sys.executable)
     def answer(self,prompt,temp,identifier,citation_count=None,mode=None):
+        if mode!='question':return {'chapters':[{'title':'Full lecture summary','text':'Il recettore lega il farmaco.','citations':[1]}]}
         data=json.loads(prompt.split('DATA:\n',1)[1]);text=data['sources'][0]['text']
         return {'sufficient':True,'answer':text,'citations':[{'source':1,'quote':text}]}
     monkeypatch.setattr(StudyEngine,'llm',answer)
@@ -66,3 +67,19 @@ def test_no_evidence_abstains_without_a_model_and_survives_backup(tmp_path):
     with TestClient(create_app(destination,TOKEN)) as client:
         result=client.get('/api/v1/questions/'+identifier,headers=AUTH).json();assert result['result']['state']=='abstained'
         assert len(client.get(f'/api/v1/subjects/{sid}/questions',headers=AUTH).json())==1
+
+
+def test_accepted_answer_does_not_mark_entire_lecture_as_summarized(tmp_path,monkeypatch):
+    sid,lid,rid,seg=seeded(tmp_path);fake_answers(monkeypatch,tmp_path)
+    monkeypatch.setattr('aulalocale.study.runtime_path',lambda name:sys.executable)
+    with TestClient(create_app(tmp_path,TOKEN)) as client:
+        identifier=client.post(f'/api/v1/subjects/{sid}/questions',headers=AUTH,json={'question':'Il recettore?','lesson_id':lid}).json()['id']
+        assert wait(client,identifier)['status']=='completed'
+        proposal=client.post('/api/v1/questions/'+identifier+'/save-note',headers=AUTH,json={'base_revision':None}).json()['id']
+        route=f'/api/v1/subjects/{sid}/notes';notes=client.get(route,headers=AUTH).json()
+        chapter=notes['proposals'][0]['chapters'][0]
+        assert chapter['generation']['cited_revisions']=={lid:rid}
+        assert not chapter['generation'].get('covered_revisions')
+        accepted=client.post(route+'/'+proposal+'/accept',headers=AUTH,json={'reviewed_chapter_ids':[chapter['id']]});assert accepted.status_code==200,accepted.text
+        generated=client.post(route+'/generate',headers=AUTH);assert generated.status_code==202,generated.text
+        assert wait(client,generated.json()['id'])['status']=='completed'
