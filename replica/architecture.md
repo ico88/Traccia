@@ -2,6 +2,10 @@
 
 Date: 2026-11-15. Baseline: `ab2941b` on `sviluppo`, archive schema 6. Inputs: [recon](recon.md), [feature matrix](features.csv), existing application code. This document is a proposed incremental design. None of the new tables, routes or background behaviors below are implemented by adding this document. The feature matrix remains unverified, not a claim that existing Traccia features are absent.
 
+## Implementation checkpoint — 2026-11-16
+
+The first build now uses archive schema 7. Five extension tables are implemented: archive_identity, note_templates, subject_preferences, lecture_annotations and study_questions. Durable pipelines reuse existing study_jobs with checkpoint/provenance markers instead of duplicating the proposed processing tables. Import queues are explicitly session-local; transcript search is literal-token scanning rather than FTS5. Questions are independent source-bound requests rather than multi-turn threads. The SQL below remains a schema-6 planning artifact, **not** the current migration; application migrations in workspace.py/questions.py are authoritative. See build-log.md for implementation and qualification status.
+
 ## Stack and decisions
 
 | Layer | Choice | Why |

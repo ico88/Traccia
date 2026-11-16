@@ -15,7 +15,7 @@ The downloadable tagged **0.10** preview remains separate from these additions. 
 
 ## Archive compatibility
 
-Development 0.11 upgrades archive/backup metadata to schema 6 so 0.10 refuses to open newer job types rather than processing them incorrectly. Keep a 0.10 backup before trying development code. The new restorer accepts both schema-5 and schema-6 backups, always into a new folder; existing originals and manual revisions are preserved. Do not attempt an in-place downgrade. Pending jobs in restored backups are marked cancelled and must be started explicitly from the app; stored job payloads are not automatically executed. Completed results and manual revisions are preserved.
+Current development 0.11.0.dev1 upgrades archive/backup metadata to schema 7 so 0.10 refuses to open newer job types rather than processing them incorrectly. Keep a 0.10 backup before trying development code. The new restorer accepts schema-5, schema-6 and schema-7 backups, always into a new folder; existing originals and manual revisions are preserved. Do not attempt an in-place downgrade. Pending jobs in restored backups are marked cancelled and must be started explicitly from the app; stored job payloads are not automatically executed. Completed results and manual revisions are preserved.
 
 ## Using audio previews
 

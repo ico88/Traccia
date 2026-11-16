@@ -174,6 +174,7 @@ class StudyEngine:
                 if job['kind']=='transcription':self.transcribe(job,Path(temp))
                 elif job['kind']=='speakers':self.speakers.execute(job,Path(temp),self)
                 elif job['kind']=='evidence':self.evidence.execute(job,Path(temp))
+                elif job['kind']=='question':self.questions.execute(job,Path(temp))
                 elif job['kind']=='pipeline':
                     from .workspace import execute_pipeline
                     execute_pipeline(self,job,Path(temp))
@@ -257,7 +258,8 @@ class StudyEngine:
         prompt_file=temp/'prompt.txt';result_file=temp/'answer.txt';grammar_file=temp/'notes.gbnf'
         prompt_file.write_text(prompt)
         from .evidence import CHECK_GRAMMAR
-        grammar=CHECK_GRAMMAR if mode=='evidence' else ROUTE_GRAMMAR if mode=='route' else MERGE_GRAMMAR if mode=='merge' else NOTES_GRAMMAR
+        from .questions import QUESTION_GRAMMAR
+        grammar=QUESTION_GRAMMAR if mode=='question' else CHECK_GRAMMAR if mode=='evidence' else ROUTE_GRAMMAR if mode=='route' else MERGE_GRAMMAR if mode=='merge' else NOTES_GRAMMAR
         if citation_count:
             allowed=' | '.join(json.dumps(str(i)) for i in range(0 if mode=='route' else 1,citation_count+1))
             grammar=grammar.replace('integer ::= [1-9] [0-9]{0,5} ws','integer ::= ('+allowed+') ws')
@@ -283,6 +285,9 @@ class StudyEngine:
                 raise ValueError('La dispensa è cambiata: avvia una nuova proposta.')
         old=previous['chapters'] if previous else []
         working,selected,revisions=note_plan(old,snapshots)
+        if payload.get('force_template_rebuild'):
+            from copy import deepcopy
+            working=[deepcopy(chapter) for chapter in old if chapter.get('manual')];selected=snapshots
         if not selected:raise ValueError('Nessuna nuova trascrizione o fonte modificata da integrare.')
         source_text={ref_key({'lesson_id':t['lesson_id'],'revision_id':t['id'],'segment_id':s['id']}):s['text'] for t in snapshots for s in t['segments']}
         def ask(mode,data,count):
@@ -445,8 +450,9 @@ def study_router(engine,authenticate):
             chosen=template_id or preferences(c,subject_id)['settings'].get('template_id')
             template=template_snapshot(c,chosen)
         if not transcripts:raise HTTPException(409,'Trascrivi almeno una lezione prima di generare la dispensa.')
-        if old and not note_plan(old['chapters'],transcripts)[1]:raise HTTPException(409,'La dispensa include già tutte le trascrizioni correnti. Aggiungi o correggi una lezione prima di aggiornarla.')
-        return enqueue('notes',str(subject_id),None,{'base_revision':old['id'] if old else None,'transcripts':transcripts,'language':language,'template':template})
+        template_changed=bool(old and any(ch.get('generation',{}).get('template')!=template for ch in old['chapters']))
+        if old and not template_changed and not note_plan(old['chapters'],transcripts)[1]:raise HTTPException(409,'La dispensa include già tutte le trascrizioni correnti. Aggiungi o correggi una lezione prima di aggiornarla.')
+        return enqueue('notes',str(subject_id),None,{'base_revision':old['id'] if old else None,'transcripts':transcripts,'language':language,'template':template,'force_template_rebuild':template_changed})
 
     @router.get('/subjects/{subject_id}/notes/revisions')
     def note_revisions(subject_id:UUID,limit:int=Query(50,ge=1,le=200),offset:int=Query(0,ge=0)):

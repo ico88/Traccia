@@ -1,10 +1,10 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
 const workspaceLaunchHash=window.location.hash;
-let subjects = [], selected = null, lessons = [], loadingVersion = 0, noticeTimer;
+let subjects = [], selected = null, lessons = [], loadingVersion = 0, noticeTimer, workspaceBooting=true;
 let selectedAudio = null, previewController = null, previewVersion = 0, importing = false;
 let autoFields = {};
-let currentLesson = null, currentAudioJob = null, audioPollTimer = null, audioSourceVersion = 0;
+let currentLesson = null, currentAudioJob = null, audioPollTimer = null, audioSourceVersion = 0, lessonOpenSequence=0;
 function notify(message, error = false) {
   $('notice').textContent = message;
   $('notice').classList.toggle('error', error);
@@ -45,6 +45,7 @@ async function allPages(path) {
   return items;
 }
 function duration(seconds) {
+  if(seconds>0 && seconds<60)return `${Math.max(1,Math.round(seconds))} s`;
   const mins = Math.round(seconds / 60);
   return mins >= 60 ? `${Math.floor(mins / 60)} h ${mins % 60} min` : `${mins} min`;
 }
@@ -101,11 +102,14 @@ async function selectSubject(id) {
     const result = await allPages(`/api/v1/subjects/${encodeURIComponent(id)}/lessons`);
     if (version !== loadingVersion) return;
     lessons = result; renderLessons();
+    if(typeof resetQuestionsForCourse==='function')resetQuestionsForCourse();
     if(typeof loadCoursePreferences==='function')await loadCoursePreferences(id);
   } catch(error){if(version===loadingVersion){$('library-message').hidden=false;$('library-message').textContent=error.message;$('library-message').className='workspace-error';}throw error;} finally { if (version === loadingVersion) $('list-status').textContent = ''; }
   return true;
 }
 async function openWorkspace() {
+  $('workspace').setAttribute('aria-busy','true');
+  try{
   subjects = await allPages('/api/v1/subjects');
   $('login-view').hidden = true; $('workspace').hidden = false;
   renderSubjects();
@@ -115,6 +119,7 @@ async function openWorkspace() {
     $('subject-title').textContent = T('Il tuo spazio di studio');
     $('subject-description').textContent = T('Una materia alla volta, una lezione dopo l’altra.');
   }
+  }finally{if(!workspaceBooting)$('workspace').setAttribute('aria-busy','false');}
 }
 $('login-form').onsubmit = async event => {
   event.preventDefault(); const button = event.submitter; button.disabled = true;
@@ -220,6 +225,7 @@ $('upload-form').onsubmit = async event => {
   finally { importing = false; $('audio-file').disabled = false; button.disabled = false; $('upload-status').textContent = T('L’originale sarà conservato senza modifiche.'); }
 };
 function resetAudioState() {
+  lessonOpenSequence++;
   if(typeof clearLessonWorkspace==='function')clearLessonWorkspace();
   if(typeof resetPreview==='function')resetPreview();
   if (typeof resetStudy === 'function') resetStudy();
@@ -282,11 +288,15 @@ async function switchAudio(improved, keepPosition = true, autoplay = null) {
 }
 async function openLesson(lesson, autoplay = false) {
   if (typeof mayLeaveTranscript === 'function' && !mayLeaveTranscript()) return false;
-  resetAudioState(); currentLesson = lesson; $('preview-end').value=Math.min(20,lesson.duration_seconds); renderLessons();
-  $('playing-title').textContent = lesson.title; $('player-panel').hidden = false;
+  const opener=document.activeElement;
+  resetAudioState();const sequence=lessonOpenSequence; currentLesson = lesson; $('preview-end').value=Math.min(20,lesson.duration_seconds); renderLessons();
+  $('playing-title').textContent = lesson.title; $('player-panel').hidden = false;$('player-panel').setAttribute('aria-busy','true');
   renderAudioJob(); switchAudio(false,false,autoplay);
   if(typeof resetLessonWorkspace==='function')resetLessonWorkspace(lesson);
-  try { await refreshAudioJob(); await loadStudy();await loadSpeakers(); } catch(e) { notify(e.message,true); }
+  try { await refreshAudioJob(); if(sequence!==lessonOpenSequence)return false;await loadStudy();if(sequence!==lessonOpenSequence)return false;await loadSpeakers(); } catch(e) { if(sequence===lessonOpenSequence)notify(e.message,true); }
+  finally{if(sequence===lessonOpenSequence)$('player-panel').setAttribute('aria-busy','false');}
+  if(sequence!==lessonOpenSequence)return false;
+  if(document.activeElement===document.body || document.activeElement===opener){$('playing-title').tabIndex=-1;$('playing-title').focus({preventScroll:true});$('player-panel').scrollIntoView({block:'start'});}
   return true;
 }
 $('source-original').onclick = () => switchAudio(false);
@@ -314,6 +324,7 @@ $('cancel-enhancement').onclick = async () => {
 $('speed').onchange = () => { $('player').playbackRate = Number($('speed').value); };
 $('player').onerror = () => { if ($('player').getAttribute('src')) notify(T('Audio non disponibile o formato non riproducibile dal browser. Prova a riaprire la sessione.'), true); };
 async function bootstrapWorkspace() {
+  $('workspace').setAttribute('aria-busy','true');
   if(document.readyState==='loading' || document.readyState==='interactive')await new Promise(resolve=>document.addEventListener('DOMContentLoaded',resolve,{once:true}));
   const access = new URLSearchParams(window.location.hash.slice(1)).get('access');
   if (access) {
@@ -331,7 +342,7 @@ $('quit-desktop').onclick=async()=>{
   try {await request('/api/v1/shutdown',{method:'POST'});signedOut();notify(T('Traccia è stata chiusa. Puoi chiudere questa scheda.'));}
   catch(e){notify(e.message,true);}
 };
-bootstrapWorkspace().catch(e => { if (!$('login-view').hidden) return; notify(e.message, true); });
+bootstrapWorkspace().catch(e => { if (!$('login-view').hidden) return; notify(e.message, true); }).finally(()=>{workspaceBooting=false;$('workspace').setAttribute('aria-busy','false');});
 
 $('lesson-search').oninput = renderLessons;
 

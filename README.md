@@ -26,6 +26,8 @@ Models run on your Mac or your own server. The standard workflow needs no accoun
 
 The `0.11` development line adds interval audio previews, read-only course-note history, archive health and reversible derivative quarantine, optional local citation review, PDF raster-figure extraction and source-linked study diagrams. [Implementation status and limits](docs/roadmap-0.11.md). These are separate from the tagged 0.10 download above.
 
+The current `sviluppo` workspace integrates the original Traccia design, reviewed multi-file imports (including MP4 audio), course defaults and glossaries, local templates, timestamped student context, a recoverable transcription-to-notes workflow, source-bound local questions and TXT/Markdown/SRT transcript exports. [Build evidence and remaining qualification](replica/build-log.md).
+
 ## One app, more than one language
 
 Choose **English or Italian** for the interface; your preference is remembered on this device. Select **Italian, English or automatic detection** for transcription, and **English or Italian** for new course-note sections. These settings are independent: changing the interface never translates or rewrites your saved lectures. Some technical diagnostics and generated image labels still use their original language.

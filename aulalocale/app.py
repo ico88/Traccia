@@ -84,6 +84,8 @@ def create_app(data_dir: Path | None = None, token: str | None = None, bootstrap
                 from .workspace import migrate_workspace,seed_templates
                 migrate_workspace(connection)
                 seed_templates(connection)
+                from .questions import migrate_questions
+                migrate_questions(connection)
             worker.start()
             yield
         finally:
@@ -168,6 +170,11 @@ def create_app(data_dir: Path | None = None, token: str | None = None, bootstrap
 
     from .evidence import EvidenceService,evidence_router
     study.evidence=EvidenceService(root,connect,worker,study)
+    from .transcript_export import transcript_export_router
+    api.include_router(transcript_export_router(study,authenticate))
+    from .questions import QuestionService,questions_router
+    study.questions=QuestionService(study)
+    api.include_router(questions_router(study.questions,authenticate))
     from .workspace import workspace_router
     api.include_router(workspace_router(study,authenticate))
     api.include_router(evidence_router(study.evidence,authenticate))

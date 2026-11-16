@@ -113,3 +113,40 @@ def test_mp4_audio_container_is_validated_and_playable(tmp_path):
         lesson=result.json();assert lesson['media_type']=='video/mp4'
         response=client.get(f"/api/v1/lessons/{lesson['id']}/audio",headers={**AUTH,'Range':'bytes=0-15'})
         assert response.status_code==206;assert len(response.content)==16
+
+
+def test_actual_schema_six_backup_upgrades_without_changing_source(tmp_path):
+    import hashlib,zipfile
+    from aulalocale.restore import restore
+    root=tmp_path/'legacy'
+    with TestClient(create_app(root,TOKEN)):pass
+    db=root/'aulalocale.sqlite3'
+    with sqlite3.connect(db) as c:
+        for table in ['study_questions','lecture_annotations','subject_preferences','note_templates','archive_identity']:c.execute('DROP TABLE '+table)
+        c.execute('PRAGMA user_version=6')
+    raw=db.read_bytes();path=tmp_path/'schema6.zip'
+    with zipfile.ZipFile(path,'w') as z:
+        z.writestr('aulalocale.sqlite3',raw)
+        z.writestr('manifest.json',json.dumps({'schema':6,'files':{'aulalocale.sqlite3':hashlib.sha256(raw).hexdigest()}}))
+    destination=tmp_path/'new';restore(path,destination)
+    with TestClient(create_app(destination,TOKEN)) as client:
+        assert len(client.get('/api/v1/templates',headers=AUTH).json())==3
+    with sqlite3.connect(destination/'aulalocale.sqlite3') as c:assert c.execute('PRAGMA user_version').fetchone()[0]==7
+    assert db.read_bytes()==raw
+
+
+def test_changing_template_prepares_new_proposal_and_preserves_manual_chapter(tmp_path,monkeypatch):
+    from test_study import enable_fake_llm
+    sid,lid,rid,seg=seeded(tmp_path);enable_fake_llm(monkeypatch,tmp_path)
+    manual={'id':str(uuid4()),'title':'My explanation','text':'Protected student wording','manual':True,'sources':[{'lesson_id':lid,'revision_id':rid,'segment_id':seg['id'],'start':0}],'generation':{'covered_revisions':{lid:rid}}}
+    automatic={**manual,'id':str(uuid4()),'manual':False,'title':'Automatic chapter','text':'Previous summary'}
+    with sqlite3.connect(tmp_path/'aulalocale.sqlite3') as c:c.execute('INSERT INTO notes VALUES (?,?,?,?,1,?)',(str(uuid4()),sid,None,json.dumps([manual,automatic]),'2026-01-01'))
+    with TestClient(create_app(tmp_path,TOKEN)) as client:
+        template=client.get('/api/v1/templates',headers=AUTH).json()[0]
+        route=f'/api/v1/subjects/{sid}/notes'
+        job=client.post(route+'/generate',params={'template_id':template['id']},headers=AUTH);assert job.status_code==202,job.text
+        assert wait(client,job.json()['id'])['status']=='completed'
+        notes=client.get(route,headers=AUTH).json();assert notes['current']['chapters']==[manual,automatic]
+        proposal=notes['proposals'][0];assert manual in proposal['chapters']
+        assert all(ch['id']!=automatic['id'] for ch in proposal['chapters'])
+        assert any(ch['generation'].get('template',{}).get('id')==template['id'] for ch in proposal['chapters'] if not ch['manual'])

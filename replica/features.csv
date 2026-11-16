@@ -1,33 +1,33 @@
 feature,area,priority,original,clone,notes
-Click or drop audio/video import,capture,must,yes,no,P02; S02; baseline exists; verify batch and partial failures
-Review editable suggested lecture metadata,capture,must,unverified,no,Traccia requirement; filename suggestions exist; no evidence of Plaud teacher/date inference
-Duplicate notice and per-file import state,capture,must,yes,no,P02; verify Traccia notice and queue independently
-Local microphone recording,capture,must,yes,no,P04 Desktop capture; Traccia records locally without handoff
-Timestamped student highlights,context,should,yes,no,P01; exact Plaud software timing/editor unobserved
-Text notes linked to a lecture,context,should,yes,no,P01; timestamp behavior is a Traccia proposal
-Images as lecture context,context,should,yes,no,P01; Traccia subject figures exist; lecture/time linking needs verification
-PDF embedded raster extraction with page provenance,context,should,no evidence,no,Traccia-specific existing feature; not established for Plaud
-Searchable library organized by subject,library,must,partial,no,P02/P09 organization; university subject model belongs to Traccia
-Full-text search across lecture transcripts,retrieval,should,yes,no,P06; distinguish filename search from content retrieval
-Audio replay and source navigation,review,must,partial,no,P06 references possible; exact synchronized player behavior unverified
-Replay original versus denoised versions,audio,must,no evidence,no,Traccia-specific existing feature; require listening qualification
-Short denoising preview with cancellation,audio,must,no evidence,no,Traccia-specific existing feature; not inferred from transcript cleanup
-Local transcription with explicit language setting,transcription,must,partial,no,P03 language setting; local inference is Traccia requirement
-Speaker labels and correction,transcription,should,partial,no,P03/P06 labeling; correction flow needs observation
-Immutable raw transcript and separate edited view,transcription,must,partial,no,P03 original/cleaned selector; immutable storage is our design
-Course glossary for specialist terms,transcription,should,yes,no,P06 custom vocabulary; verify current Traccia coverage
-Reusable default processing preferences,automation,should,yes,no,P07; map to local per-subject settings without email/cloud
-One background pipeline with stage and error feedback,processing,must,partial,no,P02/P03 async stages; unified local orchestration is our design
-Original academic summary templates,notes,should,yes,no,P05 template capability; write fresh prompts
-Independent summary language setting,notes,should,yes,no,P05; do not rely on older language behavior
-Multiple notes without replacing accepted text,notes,must,yes,no,P05 additional artifacts; course revision behavior is Traccia-specific
-Cumulative course handout with protected manual edits,notes,must,no evidence,no,Traccia-specific existing capability; no proof of Plaud equivalent
-Ask a lecture question with inspectable references,retrieval,should,yes,no,P06; references may appear; Traccia must require evidence or abstain
-Ask questions across a course,retrieval,could,partial,no,P06 cross-recording search; course-constrained Q&A is our proposal
-Save a sourced answer as a proposed study note,notes,could,yes,no,P06; retain acceptance and provenance in Traccia
-Source-linked chapter map,notes,could,partial,no,P08 summary mind map; source-linked graph is our design
-Export content and choose timestamp/speaker inclusion,export,should,yes,no,P10 historical mobile only; current Web formats unverified
-Archive backup and safe restoration,archive,must,no evidence,no,Traccia-specific; never replace user originals
+Click or drop audio/video import,capture,must,yes,yes,P02; S02; baseline exists; verify batch and partial failures; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Review editable suggested lecture metadata,capture,must,unverified,yes,Traccia requirement; filename suggestions exist; no evidence of Plaud teacher/date inference; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Duplicate notice and per-file import state,capture,must,yes,yes,P02; verify Traccia notice and queue independently; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Local microphone recording,capture,must,yes,partial,P04 Desktop capture; Traccia records locally without handoff; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits. Existing capture/chunk/recovery backend retained; fresh microphone/OS-permission qualification pending.
+Timestamped student highlights,context,should,yes,yes,P01; exact Plaud software timing/editor unobserved; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Text notes linked to a lecture,context,should,yes,yes,P01; timestamp behavior is a Traccia proposal; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Images as lecture context,context,should,yes,yes,P01; Traccia subject figures exist; lecture/time linking needs verification; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+PDF embedded raster extraction with page provenance,context,should,no evidence,yes,Traccia-specific existing feature; not established for Plaud; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Searchable library organized by subject,library,must,partial,yes,P02/P09 organization; university subject model belongs to Traccia; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Full-text search across lecture transcripts,retrieval,should,yes,yes,P06; distinguish filename search from content retrieval; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Audio replay and source navigation,review,must,partial,yes,P06 references possible; exact synchronized player behavior unverified; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Replay original versus denoised versions,audio,must,no evidence,yes,Traccia-specific existing feature; require listening qualification; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Short denoising preview with cancellation,audio,must,no evidence,yes,Traccia-specific existing feature; not inferred from transcript cleanup; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Local transcription with explicit language setting,transcription,must,partial,yes,P03 language setting; local inference is Traccia requirement; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Speaker labels and correction,transcription,should,partial,yes,P03/P06 labeling; correction flow needs observation; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Immutable raw transcript and separate edited view,transcription,must,partial,yes,P03 original/cleaned selector; immutable storage is our design; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Course glossary for specialist terms,transcription,should,yes,yes,P06 custom vocabulary; verify current Traccia coverage; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Reusable default processing preferences,automation,should,yes,yes,"P07; map to local per-subject settings without email/cloud; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits. Language, template and glossary defaults; no generic automation rule engine."
+One background pipeline with stage and error feedback,processing,must,partial,yes,P02/P03 async stages; unified local orchestration is our design; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Original academic summary templates,notes,should,yes,yes,P05 template capability; write fresh prompts; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Independent summary language setting,notes,should,yes,yes,P05; do not rely on older language behavior; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Multiple notes without replacing accepted text,notes,must,yes,yes,P05 additional artifacts; course revision behavior is Traccia-specific; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Cumulative course handout with protected manual edits,notes,must,no evidence,yes,Traccia-specific existing capability; no proof of Plaud equivalent; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Ask a lecture question with inspectable references,retrieval,should,yes,yes,P06; references may appear; Traccia must require evidence or abstain; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits. Independent questions with frozen transcript excerpts; not a threaded agent or semantic accuracy certification.
+Ask questions across a course,retrieval,could,partial,yes,P06 cross-recording search; course-constrained Q&A is our proposal; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits. Independent questions with frozen transcript excerpts; not a threaded agent or semantic accuracy certification.
+Save a sourced answer as a proposed study note,notes,could,yes,yes,P06; retain acceptance and provenance in Traccia; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Source-linked chapter map,notes,could,partial,yes,P08 summary mind map; source-linked graph is our design; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
+Export content and choose timestamp/speaker inclusion,export,should,yes,yes,P10 historical mobile only; current Web formats unverified; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits. TXT/Markdown/SRT transcript options and existing course-note exports; DOCX not implemented.
+Archive backup and safe restoration,archive,must,no evidence,yes,Traccia-specific; never replace user originals; Build 2026-11-16: real archive implementation; see build-log.md for qualification limits.
 Hardware recorder and pairing,excluded,could,yes,skip,skip: Plaud hardware firmware and electronics outside scope
 Plaud cloud sync and paid hosted inference,excluded,could,yes,skip,skip: conflicts with local free Traccia scope
 Plaud template community and proprietary prompts,excluded,could,yes,skip,skip: third-party content; implement original academic templates
