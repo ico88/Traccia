@@ -80,6 +80,10 @@ def test_accepted_answer_does_not_mark_entire_lecture_as_summarized(tmp_path,mon
         chapter=notes['proposals'][0]['chapters'][0]
         assert chapter['generation']['cited_revisions']=={lid:rid}
         assert not chapter['generation'].get('covered_revisions')
+        from aulalocale.note_consolidation import plan
+        legacy={**chapter,'generation':{**chapter['generation'],'covered_revisions':{lid:rid}}}
+        transcript=client.get('/api/v1/transcripts/'+rid,headers=AUTH).json()
+        assert plan([legacy],[transcript])[1][0]['id']==rid
         accepted=client.post(route+'/'+proposal+'/accept',headers=AUTH,json={'reviewed_chapter_ids':[chapter['id']]});assert accepted.status_code==200,accepted.text
         generated=client.post(route+'/generate',headers=AUTH);assert generated.status_code==202,generated.text
         assert wait(client,generated.json()['id'])['status']=='completed'

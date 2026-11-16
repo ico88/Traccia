@@ -23,6 +23,9 @@ def plan(old,transcripts):
     revisions={t['lesson_id']:t['id'] for t in transcripts}
     known={}
     for chapter in old:
+        # Older question drafts may still carry coverage metadata; their excerpts
+        # never establish that the complete source lecture was summarized.
+        if chapter.get('generation',{}).get('question_id'):continue
         for lid,rid in chapter.get('generation',{}).get('covered_revisions',{}).items():known.setdefault(lid,set()).add(rid)
     changed={lid for lid,rid in revisions.items() if rid not in known.get(lid,set())}
     # Rebuild connected machine-written chapters when any cited lesson changes.
